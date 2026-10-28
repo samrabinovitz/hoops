@@ -1,0 +1,474 @@
+<title>Hoops Scoreboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky header (title, date strip, three filter dropdowns), then a responsive grid of game boxes (1 col phone, 2-3 wide) */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --fg:#14171c; --muted:#646b76; --line:#dde1e7;
+  --accent:#d9480f; --live:#d6283a; --chip:#e4e7ec;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1014; --surface:#171b21; --fg:#eef1f5; --muted:#8d95a1; --line:#262c35;
+  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0d1014; --surface:#171b21; --fg:#eef1f5; --muted:#8d95a1; --line:#262c35;
+  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; color-scheme:dark }
+
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+[hidden]{display:none!important}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:14px 8px}
+h1{margin:0;font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:.01em;text-transform:uppercase}
+h1 span{color:var(--accent)}
+.updated{border:0;background:transparent;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;padding:2px 0}
+.updated:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.dates{display:flex;gap:6px;overflow-x:auto;padding-block:4px 10px;scrollbar-width:none}
+.dates::-webkit-scrollbar{display:none}
+.date{flex:0 0 auto;min-width:58px;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;
+  padding:6px 10px;border-radius:8px;display:grid;justify-items:center;line-height:1.1}
+.date b{font-family:var(--display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.date i{font-style:normal;font-family:var(--display);font-size:20px;font-weight:700;color:var(--fg)}
+.date[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.date[aria-pressed="true"] i{color:var(--bg)}
+.date:focus-visible,.filter:focus-visible,.game:focus-visible,.toggle:focus-visible,.dd-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Dropdown filter bar */
+.filterbar{position:relative;display:flex;gap:8px;padding-block:0 12px;overflow-x:auto;scrollbar-width:none}
+.filterbar::-webkit-scrollbar{display:none}
+.dd-btn{flex:1 1 0;min-width:0;display:grid;justify-items:start;gap:1px;text-align:left;border:1px solid var(--line);background:var(--chip);color:var(--fg);
+  font:inherit;border-radius:10px;padding:6px 30px 7px 12px;cursor:pointer;position:relative}
+.dd-btn::after{content:"";position:absolute;right:12px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);transition:transform .15s}
+.dd-btn[aria-expanded="true"]{border-color:var(--accent)}
+.dd-btn[aria-expanded="true"]::after{transform:translateY(-20%) rotate(-135deg)}
+.dd-k{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.dd-v{font-weight:700;font-size:14px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-btn.on .dd-v{color:var(--accent)}
+
+.dd-panel{position:fixed;z-index:20;display:grid;gap:1px;align-content:start;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  width:min(320px,calc(100vw - 32px));max-height:min(60vh,460px);padding:6px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 12px 32px rgb(0 0 0 / .18)}
+.dd-panel .sep{height:1px;background:var(--line);margin:5px 4px}
+.filter{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;border-radius:7px;padding:9px 10px;
+  background:transparent;color:var(--fg);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.filter:hover{background:var(--chip)}
+.filter::before{content:"";flex:0 0 auto;width:16px;height:16px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.filter[aria-pressed="true"]::before{content:"✓";display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff;background:var(--accent);box-shadow:none}
+.toggle{justify-self:start;margin:4px 6px 2px;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:transparent;color:var(--fg);
+  font:inherit;font-size:13px;font-weight:600;padding:4px 12px 4px 6px;border-radius:999px;cursor:pointer}
+.sw{width:26px;height:16px;border-radius:999px;background:var(--chip);box-shadow:inset 0 0 0 1px var(--line);position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.toggle[aria-pressed="true"] .sw{background:var(--accent);box-shadow:none}
+.toggle[aria-pressed="true"] .sw::after{transform:translateX(10px);background:#fff}
+
+main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
+.notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px;padding:10px 14px;border-radius:10px;
+  background:var(--chip);color:var(--fg);font-size:13px}
+.notice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer}
+.section-label{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:22px}
+@media (max-width:360px){.grid{grid-template-columns:1fr}}
+
+.game{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px 12px;display:grid;gap:8px}
+.status{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:20px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  padding-bottom:7px;border-bottom:1px solid var(--line)}
+.status .live{color:var(--live);display:inline-flex;align-items:center;gap:6px}
+.status .live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.status .final{color:var(--fg)}
+
+.team{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:10px}
+.logo{position:relative;width:36px;height:36px;border-radius:8px;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:17px;
+  color:var(--tc2);background:var(--tc1);box-shadow:inset 0 0 0 2px var(--tc2);overflow:hidden}
+.logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.logo.has-img{background:transparent;box-shadow:none;color:transparent}
+.info{min-width:0;display:grid;line-height:1.15}
+.name{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rank{font-family:var(--display);font-weight:700;font-size:14px;color:var(--accent);margin-right:-4px;font-variant-numeric:tabular-nums}
+.abbr{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:.01em}
+.conf{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.score{position:relative;font-family:var(--display);font-weight:700;font-size:28px;font-variant-numeric:tabular-nums;min-width:2ch;text-align:right;padding-right:16px}
+.team.lost .abbr,.team.lost .score{color:var(--muted);font-weight:600}
+.team.won .score::after{content:"◂";position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:14px;line-height:1;color:var(--accent)}
+.tv{flex:0 0 auto;display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:4px;background:var(--fg);color:var(--bg);
+  font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:none}
+.tv.alt{background:transparent;color:var(--fg);box-shadow:inset 0 0 0 1.5px var(--fg)}
+.empty{color:var(--muted);padding:30px 0;text-align:center}
+.skeleton{height:118px;border-radius:10px;background:var(--surface);border:1px solid var(--line);opacity:.6}
+@media (prefers-reduced-motion:reduce){.status .live::before{animation:none}.sw,.sw::after,.dd-btn::after{transition:none}}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="top"><h1>Hoops<span>.</span></h1><button class="updated" id="updated" title="Refresh now">Loading…</button></div>
+    <nav class="dates" id="dates" aria-label="Choose a date"></nav>
+    <div class="filterbar" id="filterbar">
+      <button class="dd-btn" id="btn-conf" data-panel="conf-row" aria-expanded="false" aria-controls="conf-row"><span class="dd-k">Conference</span><span class="dd-v" id="sum-conf">All</span></button>
+      <button class="dd-btn" id="btn-tv" data-panel="tv-row" aria-expanded="false" aria-controls="tv-row"><span class="dd-k">Channel</span><span class="dd-v" id="sum-tv">All</span></button>
+      <button class="dd-btn" id="btn-status" data-panel="status-row" aria-expanded="false" aria-controls="status-row"><span class="dd-k">Status</span><span class="dd-v" id="sum-status">All</span></button>
+      <div class="dd-panel" id="conf-row" role="group" aria-label="Conferences (pick any)" hidden></div>
+      <div class="dd-panel" id="tv-row" role="group" aria-label="Channel (pick any)" hidden></div>
+      <div class="dd-panel" id="status-row" role="group" aria-label="Game status (pick any)" hidden></div>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="board"></main>
+
+<script>
+/* =========================================================================
+   SETTINGS
+   ========================================================================= */
+// If ESPN ever blocks the app from reading its feed directly, put a relay address here
+// (for example "https://hoops-relay.yourname.workers.dev"). Leave empty to read ESPN directly.
+const RELAY = "";
+const FEED = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard";
+const LIVE_REFRESH_MS = 30_000;     // while any game on the chosen day is live
+const IDLE_REFRESH_MS = 5 * 60_000; // otherwise
+
+/* =========================================================================
+   CONFERENCES
+   ========================================================================= */
+// ESPN conference ids -> the names this app uses
+const CONF_BY_ID = {
+  1:"America East",2:"ACC",3:"A-10",4:"Big East",5:"Big Sky",6:"Big South",7:"Big Ten",8:"Big 12",9:"Big West",10:"CAA",
+  11:"Conference USA",12:"Ivy League",13:"MAAC",14:"MAC",16:"MEAC",18:"Missouri Valley",19:"NEC",20:"OVC",21:"Pac-12",22:"Patriot",
+  23:"SEC",24:"SoCon",25:"Southland",26:"SWAC",27:"Sun Belt",29:"WCC",30:"UAC",44:"MWC",45:"Horizon",46:"ASUN",49:"Summit",62:"American"
+};
+const P5 = ["ACC","Big Ten","Big 12","SEC","Big East"];
+const NEXT5 = ["Pac-12","WCC","A-10","American","MWC"];
+const P5PLUS = [...P5, ...NEXT5];
+const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conference USA","Horizon","Ivy League","MAAC","MAC","MEAC",
+  "Missouri Valley","NEC","OVC","Patriot","SoCon","Southland","Summit","Sun Belt","SWAC","UAC"];
+
+/* =========================================================================
+   BRACKETOLOGY (Joe Lunardi, ESPN) — projected field + first four out + next four out.
+   As of the May 2026 projection. Update this list when he releases a new one.
+   ========================================================================= */
+const BRACKET_FIELD = ["Florida","Long Island","Vermont","Wisconsin","North Carolina","St. John's","Santa Clara","USC","Yale","Vanderbilt","VCU","Providence",
+  "Virginia","Illinois State","Indiana","Texas A&M","UConn","East Tennessee State","Illinois","Southeast Missouri State","Southern","Kentucky","Saint Louis",
+  "Iowa State","High Point","Alabama","McNeese","Nebraska","Arizona State","Clemson","Gonzaga","St. Thomas","Missouri","Creighton","Arizona","UC Santa Barbara",
+  "Michigan","Montana State","Howard","Auburn","NC State","Tennessee","Marquette","Stanford","Kansas","Wichita State","Texas Tech","LSU","Oregon","Louisville","Akron",
+  "Villanova","UCLA","Arkansas","Robert Morris","Navy","Duke","Troy","Merrimack","Georgia","Ohio State","Purdue","TCU","Oklahoma","Houston","UNC Wilmington",
+  "BYU","New Mexico","Texas","Liberty","Miami","Iowa","Baylor","Michigan State","Queens","Austin Peay",
+  // First four out
+  "West Virginia","Florida State","Utah State","Maryland",
+  // Next four out
+  "Mississippi State","Xavier","Virginia Tech","Oklahoma State"];
+// Other spellings ESPN may use for the same schools
+const BRACKET_ALIASES = {"long island university":"long island","liu":"long island","st thomas-minnesota":"st thomas","st thomas (mn)":"st thomas",
+  "se missouri state":"southeast missouri state","southeast missouri st":"southeast missouri state","queens university":"queens","mcneese state":"mcneese",
+  "connecticut":"uconn","miami (fl)":"miami","miami hurricanes":"miami","saint johns":"st johns","st johns (ny)":"st johns","texas a&m":"texas aandm"};
+const normName = s => { let n=(s||"").toLowerCase().replace(/[.'’]/g,"").replace(/&/g,"and").replace(/\s+/g," ").trim(); return BRACKET_ALIASES[n]||n; };
+const BRACKET_SET = new Set(BRACKET_FIELD.map(normName));
+
+/* =========================================================================
+   TV CHANNELS
+   ========================================================================= */
+// bc = regular TV (free with an antenna), cable, conf = conference network, stream = streaming only
+const NET_TYPE = {ABC:"bc",CBS:"bc",FOX:"bc",NBC:"bc",
+  ESPN:"cable",ESPN2:"cable",ESPNU:"cable",ESPNEWS:"cable",FS1:"cable",FS2:"cable",TNT:"cable",truTV:"cable",USA:"cable",CBSSN:"cable",
+  ACCN:"conf",SECN:"conf",BTN:"conf",
+  "ESPN+":"stream",Peacock:"stream","Paramount+":"stream","SECN+":"stream",ACCNX:"stream","B1G+":"stream",FloHoops:"stream"};
+const TV_ALIAS = {"acc network":"ACCN","accn":"ACCN","sec network":"SECN","secn":"SECN","big ten network":"BTN","btn":"BTN",
+  "cbs sports network":"CBSSN","cbs sports net":"CBSSN","cbssn":"CBSSN","usa net":"USA","usa network":"USA","usa":"USA","trutv":"truTV",
+  "peacock":"Peacock","espn+":"ESPN+","sec network +":"SECN+","sec network+":"SECN+","secn+":"SECN+","accnx":"ACCNX","acc network extra":"ACCNX",
+  "b1g+":"B1G+","paramount+":"Paramount+","flohoops":"FloHoops","flosports":"FloHoops","fox":"FOX","fs1":"FS1","fs2":"FS2","espn":"ESPN","espn2":"ESPN2",
+  "espnu":"ESPNU","espnews":"ESPNEWS","cbs":"CBS","abc":"ABC","nbc":"NBC","tnt":"TNT"};
+const normTV = n => TV_ALIAS[(n||"").trim().toLowerCase()] || (n||"").trim();
+const netType = n => NET_TYPE[n] || (/\+|flo|stream|app/i.test(n) ? "stream" : "cable"); // unknown regional channels count as cable
+const TYPE_ORDER = {bc:0,cable:1,conf:2,stream:3};
+const isAlt = n => { const t=netType(n); return t==="conf"||t==="stream"; };
+
+/* =========================================================================
+   READING ESPN'S FEED -> one tidy object per game
+   ========================================================================= */
+function parseTeam(c, state){
+  const t = c.team || {};
+  const recs = c.records || [];
+  const total = recs.find(r=>r.type==="total"||r.name==="overall"||r.name==="All Splits") || recs[0];
+  const vsconf = recs.find(r=>r.type==="vsconf"||/conf/i.test(r.name||""));
+  const rank = c.curatedRank && c.curatedRank.current;
+  const school = t.location || t.shortDisplayName || t.displayName || "";
+  const raw = typeof c.score==="object" && c.score ? c.score.value : c.score;
+  return {
+    abbr: t.abbreviation || (t.shortDisplayName||"?").slice(0,5).toUpperCase(),
+    school,
+    conf: CONF_BY_ID[t.conferenceId] || "",
+    rank: rank && rank <= 25 ? rank : null,
+    rec: total ? total.summary : "",
+    crec: vsconf ? vsconf.summary : "",
+    score: state==="u" || raw==null || raw==="" ? null : Number(raw),
+    winner: c.winner === true,
+    logo: t.logo || (t.logos && t.logos[0] && t.logos[0].href) || "",
+    c1: t.color ? "#"+t.color : "#5b6470",
+    c2: t.alternateColor ? "#"+t.alternateColor : "#ffffff",
+    inBracket: [school, t.shortDisplayName, t.displayName && t.name ? t.displayName.replace(" "+t.name,"") : ""].some(n=>n&&BRACKET_SET.has(normName(n)))
+  };
+}
+function parseTV(comp){
+  const names = [];
+  for(const b of comp.broadcasts||[]) for(const n of b.names||[]) names.push(n);
+  for(const g of comp.geoBroadcasts||[]) if(g.media && g.media.shortName) names.push(g.media.shortName);
+  const nets = [...new Set(names.map(normTV).filter(Boolean))];
+  nets.sort((a,b)=>TYPE_ORDER[netType(a)]-TYPE_ORDER[netType(b)]);
+  return nets;
+}
+function parseEvent(ev){
+  const comp = ev.competitions && ev.competitions[0]; if(!comp) return null;
+  const st = (comp.status && comp.status.type) || (ev.status && ev.status.type) || {};
+  const state = st.state==="in" ? "l" : st.state==="post" ? "f" : "u";
+  const side = {};
+  for(const c of comp.competitors||[]) side[c.homeAway] = parseTeam(c, state);
+  if(!side.home || !side.away) return null;
+  let detail;
+  if(state==="u") detail = /TBD|TBA/i.test(st.detail||"") ? "TBD" : new Date(ev.date).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  else if(state==="l") detail = st.shortDetail || st.detail || "Live";
+  else detail = st.shortDetail || "Final";
+  const done = state==="f" && st.completed !== false;
+  if(state==="f" && !done){ side.home.score = side.away.score = null; } // postponed / canceled
+  if(done && !side.home.winner && !side.away.winner && side.home.score!=null && side.away.score!=null){
+    side.home.winner = side.home.score > side.away.score; side.away.winner = side.away.score > side.home.score;
+  }
+  return {id:ev.id, state, detail, done, time:Date.parse(ev.date)||0, away:side.away, home:side.home, nets:parseTV(comp)};
+}
+
+/* =========================================================================
+   SAMPLE GAMES — shown only when the live feed can't be reached (e.g. inside the Claude preview)
+   ========================================================================= */
+const S_TEAMS = {
+ UVA:["Virginia","ACC","#232d4b","#f84c1e"],DUKE:["Duke","ACC","#003087","#ffffff"],UNC:["North Carolina","ACC","#7bafd4","#13294b"],LOU:["Louisville","ACC","#ad0000","#ffffff"],
+ UK:["Kentucky","SEC","#0033a0","#ffffff"],TENN:["Tennessee","SEC","#ff8200","#ffffff"],BAMA:["Alabama","SEC","#9e1b32","#ffffff"],AUB:["Auburn","SEC","#0c2340","#e87722"],
+ KU:["Kansas","Big 12","#0051ba","#e8000d"],HOU:["Houston","Big 12","#c8102e","#ffffff"],BAY:["Baylor","Big 12","#154734","#ffb81c"],ARIZ:["Arizona","Big 12","#0c234b","#ab0520"],
+ UCONN:["UConn","Big East","#000e2f","#ffffff"],MARQ:["Marquette","Big East","#003366","#ffcc00"],CREI:["Creighton","Big East","#005ca9","#ffffff"],SJU:["St. John's","Big East","#c8102e","#ffffff"],
+ PUR:["Purdue","Big Ten","#000000","#cfb991"],MICH:["Michigan","Big Ten","#00274c","#ffcb05"],ILL:["Illinois","Big Ten","#13294b","#e84a27"],MSU:["Michigan State","Big Ten","#18453b","#ffffff"],
+ GONZ:["Gonzaga","Pac-12","#041e42","#c8102e"],SDSU:["San Diego State","Pac-12","#a6192e","#000000"],USU:["Utah State","Pac-12","#0f2439","#ffffff"],
+ SMC:["Saint Mary's","WCC","#06315b","#d80024"],SF:["San Francisco","WCC","#00543c","#fdbb30"],DAY:["Dayton","A-10","#ce1141","#004b8d"],VCU:["VCU","A-10","#000000","#f8b800"],
+ MEM:["Memphis","American","#003087","#898d8d"],FAU:["Florida Atlantic","American","#003366","#cc0000"],UNM:["New Mexico","MWC","#ba0c2f","#a7a8aa"],NEV:["Nevada","MWC","#003366","#807f84"]
+};
+const S_REC = {UVA:"16-4 (7-2)",DUKE:"17-3 (8-1)",UNC:"14-6 (5-4)",LOU:"12-8 (4-5)",UK:"15-5 (5-3)",TENN:"17-3 (6-2)",BAMA:"16-4 (6-2)",AUB:"18-2 (8-0)",
+ KU:"15-5 (5-4)",HOU:"17-3 (8-1)",BAY:"13-7 (4-5)",ARIZ:"14-6 (6-3)",UCONN:"16-4 (8-1)",MARQ:"15-5 (6-3)",CREI:"13-7 (5-4)",SJU:"16-4 (7-2)",
+ PUR:"17-3 (8-1)",MICH:"14-6 (5-4)",ILL:"15-5 (6-3)",MSU:"16-4 (7-2)",GONZ:"18-3 (6-0)",SMC:"17-4 (6-1)",
+ SDSU:"15-5 (6-2)",USU:"16-4 (6-2)",SF:"13-7 (4-3)",DAY:"15-5 (5-2)",VCU:"16-4 (6-1)",MEM:"16-4 (6-1)",FAU:"14-6 (5-2)",UNM:"15-5 (6-2)",NEV:"13-7 (4-4)"};
+const S_RANK = {AUB:1,DUKE:2,HOU:3,GONZ:4,PUR:5,UCONN:6,TENN:7,UVA:8,SJU:9,BAMA:11,MSU:12,UK:14,SMC:15,MARQ:17,ILL:19,KU:21,ARIZ:24};
+const S_NETS = {"ACC":["ESPN","ACCN"],"SEC":["ESPN2","SECN"],"Big Ten":["FOX","BTN","Peacock"],"Big East":["FS1","FOX","TNT"],"Big 12":["ESPN2","ESPN+","CBS"],
+  "WCC":["ESPN2","ESPN+"],"Pac-12":["CBS","FOX","CBSSN"],"A-10":["CBSSN","USA"],"American":["ESPN2","ESPNU"],"MWC":["CBSSN","FS1"]};
+// day offset from today -> games [state, away, awayScore, home, homeScore, detail]
+const S_DAYS = {
+ "-1":[["f","UVA",71,"UNC",64],["f","AUB",88,"BAMA",91],["f","PUR",77,"MSU",70],["f","GONZ",82,"SMC",79,"Final/OT"],["f","KU",68,"BAY",62],["f","SDSU",75,"USU",70],["f","UNM",69,"NEV",72]],
+ "0":[["l","DUKE",54,"LOU",41,"11:08 - 2nd Half"],["l","UCONN",33,"MARQ",36,"Halftime"],["l","TENN",22,"UK",19,"6:42 - 1st Half"],["l","DAY",48,"VCU",50,"9:15 - 2nd Half"],
+  ["f","HOU",74,"ARIZ",66],["f","ILL",80,"MICH",83],
+  ["u","UVA",null,"DUKE",null,"7:00 PM"],["u","MEM",null,"FAU",null,"7:00 PM"],["u","CREI",null,"SJU",null,"8:30 PM"],["u","SF",null,"SMC",null,"9:00 PM"],["u","GONZ",null,"KU",null,"10:00 PM"]],
+ "1":[["u","UNC",null,"LOU",null,"6:30 PM"],["u","BAMA",null,"TENN",null,"7:00 PM"],["u","MSU",null,"MICH",null,"8:00 PM"],["u","HOU",null,"BAY",null,"9:00 PM"],["u","NEV",null,"SDSU",null,"10:00 PM"]],
+ "2":[["u","UK",null,"AUB",null,"7:00 PM"],["u","MARQ",null,"CREI",null,"8:00 PM"],["u","ARIZ",null,"KU",null,"9:00 PM"]]
+};
+function sampleRecord(abbr, off){ // records move as earlier sample games go final
+  let [w,l,cw,cl] = S_REC[abbr].match(/\d+/g).map(Number);
+  for(const k of Object.keys(S_DAYS).map(Number).filter(k=>k<=off)) for(const g of S_DAYS[k]){
+    if(g[0]!=="f") continue; const [,a,as,h,hs]=g; if(a!==abbr && h!==abbr) continue;
+    const won = a===abbr ? as>hs : hs>as, conf = S_TEAMS[a][1]===S_TEAMS[h][1];
+    if(won){w++; if(conf) cw++} else {l++; if(conf) cl++}
+  }
+  return [`${w}-${l}`, `${cw}-${cl}`];
+}
+function sampleGames(off){
+  return (S_DAYS[off]||[]).map((g,i)=>{
+    const [state,a,as,h,hs,extra] = g;
+    const mk = (ab,s,o) => { const [school,conf,c1,c2]=S_TEAMS[ab]; const [rec,crec]=sampleRecord(ab,off);
+      return {abbr:ab,school,conf,rank:S_RANK[ab]||null,rec,crec,score:s,winner:state==="f"&&s>o,logo:"",c1,c2,inBracket:BRACKET_SET.has(normName(school))}; };
+    const nets = S_NETS[S_TEAMS[h][1]]; let x=0; for(const c of a+h) x+=c.charCodeAt(0);
+    return {id:"s"+off+"-"+i,state,detail:extra||(state==="f"?"Final":""),done:state==="f",time:i,away:mk(a,as,hs),home:mk(h,hs,as),nets:[nets[x%nets.length]]};
+  });
+}
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const DAY_RANGE = 7;                     // days shown before and after today
+let dayOff = 0;                          // selected day, as offset from today
+let mode = "live";                       // "live" or "sample"
+let games = [];                          // games for the selected day
+let loading = true, lastUpdated = null, timer = null, reqId = 0;
+let confs = new Set(), statuses = new Set(), tvs = new Set(["t:tv"]), bothTeams = false; // "On TV" is the default channel filter
+try{ const s = JSON.parse(localStorage.getItem("hoops-filters-v2")||"null");
+  if(s){ confs=new Set(s.confs||[]); statuses=new Set(s.statuses||[]); tvs=new Set(s.tvs||[]); bothTeams=!!s.both; } }catch(e){}
+function saveFilters(){ try{ localStorage.setItem("hoops-filters-v2", JSON.stringify({confs:[...confs],statuses:[...statuses],tvs:[...tvs],both:bothTeams})) }catch(e){} }
+
+const dateFor = off => { const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+off); return d; };
+const ymd = d => d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
+
+/* =========================================================================
+   FILTERS
+   ========================================================================= */
+const abc = a => [...a].sort((x,y)=>x.localeCompare(y,"en",{sensitivity:"base"}));
+const toChips = a => abc(a).map(c=>["c:"+c,c]);
+const CONF_CHIPS = [["top25","Top 25"],["bracket","Bracketology"],["p5","Power 5"],["p5plus","Power 5+"],null,
+  ...toChips(P5),null,...toChips(NEXT5),null,...toChips(REST)];
+const TV_LIST = ["ABC","CBS","FOX","NBC","ESPN","ESPN2","ESPNU","FS1","TNT","truTV","USA","CBSSN","ACCN","SECN","BTN","ESPN+","Peacock","Paramount+"];
+const TV_CHIPS = [["t:tv","On TV"],null,["t:bc","Regular TV"],["t:cable","Cable"],["t:conf","Conference networks"],["t:stream","Streaming"],null,
+  ...abc(TV_LIST).map(n=>["n:"+n,n])];
+const STATUS_CHIPS = [["l","Live"],["f","Final"],["u","Upcoming"]];
+const rowSet = r => r==="conf" ? confs : r==="tv" ? tvs : statuses;
+
+function teamFits(t){
+  for(const c of confs){
+    if(c==="top25" && t.rank) return true;
+    if(c==="bracket" && t.inBracket) return true;
+    if(c==="p5" && P5.includes(t.conf)) return true;
+    if(c==="p5plus" && P5PLUS.includes(t.conf)) return true;
+    if(c==="c:"+t.conf) return true;
+  }
+  return false;
+}
+// "Both teams" on: each team must fit at least one pick. Off: either team is enough.
+const confFits = g => !confs.size || (bothTeams ? teamFits(g.away)&&teamFits(g.home) : teamFits(g.away)||teamFits(g.home));
+const tvFits = g => !tvs.size || g.nets.some(n => { const t=netType(n);
+  return tvs.has("n:"+n) || tvs.has("t:"+t) || (tvs.has("t:tv") && t!=="stream"); });
+
+/* =========================================================================
+   RENDERING
+   ========================================================================= */
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function teamRow(t, g){
+  const cls = g.state==="f" && g.done ? (t.winner ? "won" : "lost") : "";
+  const logo = t.logo
+    ? `<div class="logo has-img" style="--tc1:${esc(t.c1)};--tc2:${esc(t.c2)}" aria-hidden="true">${esc(t.abbr[0])}<img src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.parentNode.classList.remove('has-img');this.remove()"></div>`
+    : `<div class="logo" style="--tc1:${esc(t.c1)};--tc2:${esc(t.c2)}" aria-hidden="true">${esc(t.abbr[0])}</div>`;
+  const rec = t.rec ? `${esc(t.rec)}${t.crec ? ` (${esc(t.crec)})` : ""}` : "";
+  return `<div class="team ${cls}">${logo}
+    <div class="info"><div class="name">${t.rank?`<span class="rank" aria-label="Ranked ${t.rank}">${t.rank}</span>`:""}<span class="abbr">${esc(t.abbr)}</span><span class="conf">${esc(t.conf)}</span></div>
+      <span class="rec">${rec}</span></div>
+    <div class="score">${t.score ?? ""}</div></div>`;
+}
+function box(g){
+  const status = g.state==="l" ? `<span class="live">${esc(g.detail)}</span>` : g.state==="f" ? `<span class="final">${esc(g.detail)}</span>` : `<span>${esc(g.detail)}</span>`;
+  const net = g.nets[0];
+  const tv = g.state!=="f" && net ? `<span class="tv${isAlt(net)?" alt":""}">${esc(net)}</span>` : "";
+  return `<article class="game" tabindex="0" aria-label="${esc(g.away.school)} at ${esc(g.home.school)}"><div class="status">${status}${tv}</div>
+    ${teamRow(g.away,g)}${teamRow(g.home,g)}</article>`;
+}
+function summary(set, chips){
+  if(!set.size) return "All";
+  const lab = v => (chips.find(c=>c&&c[0]===v)||[,v])[1];
+  return set.size===1 ? lab([...set][0]) : set.size===2 ? [...set].map(lab).join(", ") : `${set.size} selected`;
+}
+function renderDates(){
+  const el = document.getElementById("dates"); let html="";
+  for(let off=-DAY_RANGE; off<=DAY_RANGE; off++){
+    const d = dateFor(off);
+    const label = off===0 ? "Today" : d.toLocaleDateString([], {weekday:"short"});
+    html += `<button class="date" id="d${off+DAY_RANGE}" data-off="${off}" aria-pressed="${off===dayOff}" aria-label="${d.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"})}"><b>${label}</b><i>${d.getDate()}</i></button>`;
+  }
+  el.innerHTML = html;
+}
+function render(){
+  document.querySelectorAll(".date").forEach(b=>b.setAttribute("aria-pressed", +b.dataset.off===dayOff));
+  document.querySelectorAll(".filter").forEach(b=>{ const set=rowSet(b.dataset.row);
+    b.setAttribute("aria-pressed", b.dataset.v==="all" ? !set.size : set.has(b.dataset.v)); });
+  document.getElementById("both").setAttribute("aria-pressed", bothTeams);
+  for(const [id,set,chips] of [["conf",confs,CONF_CHIPS],["tv",tvs,TV_CHIPS],["status",statuses,STATUS_CHIPS]]){
+    document.getElementById("sum-"+id).textContent = summary(set,chips) + (id==="conf"&&bothTeams&&set.size ? " · both" : "");
+    document.getElementById("btn-"+id).classList.toggle("on", set.size>0);
+  }
+  const up = document.getElementById("updated");
+  up.textContent = mode==="sample" ? "Sample games" : loading && !lastUpdated ? "Loading…" :
+    lastUpdated ? "Updated " + lastUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
+
+  const board = document.getElementById("board");
+  const notice = mode==="sample" ? `<div class="notice"><span>Can't reach live scores here, so these are sample games.</span><button id="retry">Try again</button></div>` : "";
+  if(loading && !games.length){ board.innerHTML = notice + `<div class="grid">${'<div class="skeleton"></div>'.repeat(6)}</div>`; return; }
+
+  const shown = games.filter(g=>confFits(g)&&tvFits(g));
+  let html = "";
+  for(const [k,label] of [["l","Live"],["f","Final"],["u","Upcoming"]]){
+    if(statuses.size && !statuses.has(k)) continue;
+    const list = shown.filter(g=>g.state===k); if(!list.length) continue;
+    if(k==="u") list.sort((a,b)=>a.time-b.time);
+    html += `<h2 class="section-label">${label} · ${list.length}</h2><div class="grid">${list.map(box).join("")}</div>`;
+  }
+  const day = dateFor(dayOff).toLocaleDateString([], {month:"short", day:"numeric"});
+  board.innerHTML = notice + (html || `<p class="empty">${games.length ? "No games match these filters" : "No games scheduled"} for ${day}.</p>`);
+}
+
+/* =========================================================================
+   LOADING + AUTO REFRESH
+   ========================================================================= */
+async function load(){
+  const my = ++reqId; loading = true; render();
+  if(mode==="live"){
+    try{
+      const r = await fetch(`${FEED}?groups=50&limit=500&dates=${ymd(dateFor(dayOff))}`, {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j = await r.json();
+      if(my!==reqId) return;
+      games = (j.events||[]).map(parseEvent).filter(Boolean);
+      lastUpdated = new Date();
+    }catch(e){
+      if(my!==reqId) return;
+      if(!lastUpdated){ mode = "sample"; games = sampleGames(dayOff); } // never loaded live data: fall back to samples
+    }
+  } else {
+    games = sampleGames(dayOff);
+  }
+  loading = false; render(); schedule();
+}
+function schedule(){
+  clearTimeout(timer);
+  if(mode!=="live" || document.hidden) return;
+  timer = setTimeout(load, games.some(g=>g.state==="l") ? LIVE_REFRESH_MS : IDLE_REFRESH_MS);
+}
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) clearTimeout(timer); else if(mode==="live") load(); });
+
+/* =========================================================================
+   FILTER MENUS + EVENTS
+   ========================================================================= */
+function chipRow(id,row,allLabel,chips){
+  document.getElementById(id).innerHTML = `<button class="filter all" data-row="${row}" data-v="all">${allLabel}</button><div class="sep"></div>` +
+    chips.map(c=>c ? `<button class="filter" id="${row}-${c[0].replace(/\+/g,"plus").replace(/\W/g,"")}" data-row="${row}" data-v="${esc(c[0])}">${esc(c[1])}</button>` : `<div class="sep"></div>`).join("");
+}
+chipRow("conf-row","conf","All conferences",CONF_CHIPS);
+chipRow("tv-row","tv","All channels",TV_CHIPS);
+chipRow("status-row","status","All games",STATUS_CHIPS);
+document.querySelector("#conf-row .sep").insertAdjacentHTML("beforebegin",
+  `<button class="toggle" id="both" aria-pressed="false" title="Only show games where both teams fit your picks"><span class="sw" aria-hidden="true"></span>Both teams</button>`);
+
+function closeAll(){ document.querySelectorAll(".dd-btn").forEach(b=>{ b.setAttribute("aria-expanded","false"); document.getElementById(b.dataset.panel).hidden=true; }); }
+function place(btn,p){ const r=btn.getBoundingClientRect(), w=p.offsetWidth;
+  p.style.top=(r.bottom+6)+"px"; p.style.left=Math.max(16,Math.min(r.left,innerWidth-w-16))+"px"; }
+document.getElementById("filterbar").addEventListener("click", e=>{
+  const btn = e.target.closest(".dd-btn");
+  if(btn){ const p=document.getElementById(btn.dataset.panel), open=btn.getAttribute("aria-expanded")==="true";
+    closeAll(); if(!open){ btn.setAttribute("aria-expanded","true"); p.hidden=false; place(btn,p); } return; }
+  if(e.target.closest("#both")){ bothTeams=!bothTeams; saveFilters(); render(); return; }
+  const b = e.target.closest(".filter"); if(!b) return;
+  const set = rowSet(b.dataset.row), v = b.dataset.v;
+  if(v==="all") set.clear(); else if(set.has(v)) set.delete(v); else set.add(v);
+  saveFilters(); render();
+});
+document.addEventListener("click", e=>{ if(!e.target.closest(".filterbar")) closeAll(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeAll(); });
+addEventListener("resize", closeAll); addEventListener("scroll", closeAll, {passive:true});
+
+document.getElementById("dates").addEventListener("click", e=>{
+  const b = e.target.closest(".date"); if(!b) return;
+  dayOff = +b.dataset.off; games = []; load();
+});
+document.getElementById("updated").addEventListener("click", ()=>{ if(mode==="live") load(); });
+document.getElementById("board").addEventListener("click", e=>{
+  if(e.target.closest("#retry")){ mode="live"; lastUpdated=null; games=[]; load(); }
+});
+
+renderDates();
+document.getElementById("d"+DAY_RANGE).scrollIntoView({inline:"center", block:"nearest"});
+load();
+
+// Installed as a phone app: keep the app shell available offline
+if("serviceWorker" in navigator && document.querySelector('link[rel="manifest"]')) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
