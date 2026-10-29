@@ -83,12 +83,9 @@ main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
   background:var(--chip);color:var(--fg);font-size:13px}
 .notice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer}
 
-#board{min-height:70vh}
-.slide-l{animation:slideL .22s ease-out}
-.slide-r{animation:slideR .22s ease-out}
-@keyframes slideL{from{opacity:.3;transform:translateX(40px)}to{opacity:1;transform:none}}
-@keyframes slideR{from{opacity:.3;transform:translateX(-40px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.slide-l,.slide-r{animation:none}}
+/* Page never moves sideways; a sideways swipe on the games only switches the day */
+html,body{overflow-x:hidden;overscroll-behavior-x:none}
+#board{min-height:70vh;touch-action:pan-y}
 .count{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--muted)}
 .count b{font-family:var(--display);font-size:20px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
 .section-label{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
@@ -531,11 +528,8 @@ document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
     const next = dayOff + (dx<0 ? 1 : -1);
     if(next<FIRST_OFF || next>LAST_OFF) return;
     closeAll();
-    board.classList.remove("slide-l","slide-r"); void board.offsetWidth;
-    board.classList.add(dx<0 ? "slide-l" : "slide-r");
     goTo(next);
   }, {passive:true});
-  board.addEventListener("animationend", ()=>board.classList.remove("slide-l","slide-r"));
 })();
 document.getElementById("jump").addEventListener("change", e=>{
   const v=e.target.value; if(!v) return; const [y,m,d]=v.split("-").map(Number); goTo(offFor(new Date(y,m-1,d)));
