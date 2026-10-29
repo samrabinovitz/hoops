@@ -158,6 +158,29 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .bk-list p{margin:2px 0 8px;font-size:12px;color:var(--muted)}
 .bk-list ol{margin:0;padding:0;list-style:none;display:grid;gap:6px}
 .bk-list .bk-name{font-size:14px}
+.aq{display:inline-block;flex:0 0 auto;width:11px;height:11px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--accent);vertical-align:-1px}
+.aq.done{background:var(--accent)}
+.bk-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px;font-size:12px;color:var(--muted)}
+.bk-team.hit .bk-name{color:var(--accent)}
+.bk-team.hit{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.bk-search{position:relative;margin:0 0 10px}
+.bk-search input{width:100%;font:inherit;font-size:16px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 38px}
+.bk-search .mag{position:absolute;left:12px;top:50%;width:18px;height:18px;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.bk-search input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.bk-sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:12;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgb(0 0 0 / .18);padding:4px;display:grid}
+.bk-s{display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;background:transparent;color:var(--fg);font:inherit;font-size:15px;font-weight:600;text-align:left;padding:9px 10px;border-radius:7px;cursor:pointer}
+.bk-s:hover,.bk-s:focus-visible{background:var(--chip);outline:none}
+.bk-s small{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.bk-s small.in{color:var(--accent)}
+.bk-r{background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+.bk-r p{margin:4px 0 0;font-size:14px;line-height:1.4;color:var(--muted)}
+.bk-r-head{display:flex;align-items:center;gap:8px}
+.bk-r-head .logo{width:26px;height:26px;border-radius:6px;font-size:12px}
+.bk-r-head b{font-size:17px}
+.bk-r-head span{font-size:12px;color:var(--muted)}
+.bk-r .bk-r-main{margin-top:8px;font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.01em;color:var(--fg)}
+.bk-r .bk-r-main.in{color:var(--accent)}
+.bk-r-go{margin-top:10px;border:1px solid var(--line);background:var(--chip);color:var(--fg);font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer}
 .st-row.bpi .st-team{gap:6px}
 .st-row .ap{color:var(--accent);font-family:var(--display);font-weight:700;font-size:17px}
 .st-head .ap{color:var(--muted)}
@@ -302,7 +325,14 @@ const BRACKET = {
   lastFourByes:  ["Indiana","Cincinnati","Baylor","Wisconsin"],
   lastFourIn:    ["Providence","Utah State","Creighton","New Mexico"],
   firstFourOut:  ["Maryland","Virginia Tech","LSU","Oklahoma State"],
-  nextFourOut:   ["Florida State","Xavier","SMU","Ole Miss"]
+  nextFourOut:   ["Florida State","Xavier","SMU","Ole Miss"],
+  // Automatic qualifiers (projected conference champions), marked with a hollow circle on Lunardi's page.
+  // Move a team to autoBidsConfirmed once it actually wins its conference tournament.
+  autoBids: ["Florida","Central Arkansas","Howard","Wichita State","Santa Clara","Saint Louis","UC San Diego","Montana State","Wright State",
+    "Illinois","Queens","Tennessee State","McNeese","Liberty","Furman","Duke","Vermont","American","UNC Wilmington","Grand Canyon",
+    "Harvard","UConn","James Madison","Merrimack","Arizona","Bethune-Cookman","Long Island","High Point","Miami (OH)","Murray State",
+    "North Dakota State","Gonzaga"],
+  autoBidsConfirmed: []
 };
 // Every team the Bracketology filter counts: the projected field + first four out + next four out
 const BRACKET_FIELD = [
@@ -631,7 +661,7 @@ document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
   const board = document.getElementById("board");
   let x0=null, y0=0, t0=0;
   document.addEventListener("touchstart", e=>{
-    if(e.touches.length!==1 || e.target.closest("header,.dd-panel")){ x0=null; return; }
+    if(e.touches.length!==1 || e.target.closest("header,.dd-panel,.bk-search,.bk-r")){ x0=null; return; }
     x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now();
   }, {passive:true});
   document.addEventListener("touchend", e=>{
@@ -795,12 +825,29 @@ function renderBPI(el, notice){
     <p class="st-note">BPI is ESPN's power rating: how many points better than an average Division I team on a neutral court. 7D is the change in rank over the last week.</p>`;
 }
 // Lunardi's projected bracket, drawn from BRACKET (logos and AP ranks come from the standings data)
+let bkQuery = "", bkPick = null;   // search box text, and the team picked from it
+function bracketIndex(){
+  // Where each team sits: seed, region, pod, opponent, opening-round partner, bubble list
+  const idx = {};
+  const add = (n, info) => { idx[normName(n)] = Object.assign(idx[normName(n)]||{name:n}, info); };
+  for(const r of BRACKET.regions) for(const pd of r.pods) for(const g of pd.games){
+    for(let k=0;k<2;k++){ const [seed,...teams]=g[k], [oSeed,...opp]=g[1-k];
+      teams.forEach(t=>add(t,{seed, region:r.name, regionSite:r.site, pod:pd.site, opp, oSeed, partner:teams.length>1?teams.find(x=>x!==t):null})); }
+  }
+  for(const [key,label] of [["lastFourByes","Last four byes"],["lastFourIn","Last four in"],["firstFourOut","First four out"],["nextFourOut","Next four out"]])
+    BRACKET[key].forEach(t=>add(t,{bubble:label, out:/out/i.test(label)}));
+  for(const t of BRACKET.autoBids) add(t,{aq:"projected"});
+  for(const t of BRACKET.autoBidsConfirmed||[]) add(t,{aq:"confirmed"});
+  return idx;
+}
+const aqMark = kind => kind ? `<span class="aq ${kind==="confirmed"?"done":""}" title="${kind==="confirmed"?"Clinched automatic bid":"Projected automatic bid"}" aria-label="${kind==="confirmed"?"Clinched automatic bid":"Projected automatic bid"}"></span>` : "";
 function renderBracket(el){
   const byName = {};
   for(const rows of Object.values(stData||{})) for(const r of rows) byName[normName(r.school)] = r;
   const look = n => byName[normName(n)] || null;
-  const teamHTML = n => { const t = look(n), rank = t && apRanks[t.id];
-    return `<span class="bk-team">${t ? logoHTML(t) : `<span class="logo" aria-hidden="true" style="--tc1:var(--chip);--tc2:var(--line)"></span>`}${rank?`<span class="rank">${rank}</span>`:""}<span class="bk-name">${esc(n)}</span></span>`; };
+  const idx = bracketIndex();
+  const teamHTML = n => { const t = look(n), rank = t && apRanks[t.id], info = idx[normName(n)]||{};
+    return `<span class="bk-team" data-team="${esc(normName(n))}">${t ? logoHTML(t) : `<span class="logo" aria-hidden="true" style="--tc1:var(--chip);--tc2:var(--line)"></span>`}${rank?`<span class="rank">${rank}</span>`:""}<span class="bk-name">${esc(n)}</span>${aqMark(info.aq)}</span>`; };
   const slot = side => { const [seed, ...teams] = side;
     return `<div class="bk-slot${teams.length>1?" pair":""}"><span class="bk-seed">${seed}</span><div class="bk-teams">${teams.map(teamHTML).join(`<span class="bk-or">or</span>`)}</div>${teams.length>1?`<span class="bk-tag">Opening round</span>`:""}</div>`; };
   const regions = BRACKET.regions.map(r=>`<section class="bk-region" aria-label="${esc(r.name)} region">
@@ -808,7 +855,16 @@ function renderBracket(el){
       ${r.pods.map(pd=>`<div class="bk-pod"><div class="bk-site">${esc(pd.site)}</div>${pd.games.map(g=>`<div class="bk-game">${slot(g[0])}${slot(g[1])}</div>`).join("")}</div>`).join("")}
     </section>`).join("");
   const list = (title, sub, names) => `<div class="bk-list"><h4>${title}</h4><p>${sub}</p><ol>${names.map(n=>`<li>${teamHTML(n)}</li>`).join("")}</ol></div>`;
+  const nAQ = BRACKET.autoBids.length;
   el.innerHTML = `<div class="st-title"><h2>Bracketology</h2><span>Lunardi · ${esc(BRACKET_UPDATED.replace(/,\s*\d{4}$/,""))}</span></div>
+    <div class="bk-search" role="search">
+      <label class="vh" for="bk-q">Find a team</label>
+      <svg class="mag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+      <input id="bk-q" type="search" placeholder="Find a team…" autocomplete="off" autocapitalize="words" spellcheck="false" value="${esc(bkQuery)}">
+      <div class="bk-sugg" id="bk-sugg" role="listbox" hidden></div>
+    </div>
+    <div id="bk-result"></div>
+    <p class="bk-legend">${aqMark("projected")} Projected automatic bid (conference champion) · ${nAQ} teams${(BRACKET.autoBidsConfirmed||[]).length?` · ${aqMark("confirmed")} Clinched`:""}</p>
     <div class="bk-regions">${regions}</div>
     <h3 class="bk-bubble-h">On the bubble</h3>
     <div class="bk-bubble">
@@ -818,6 +874,61 @@ function renderBracket(el){
       ${list("Next four out","Teams 81–84",BRACKET.nextFourOut)}
     </div>
     <p class="st-note">Joe Lunardi's projected 76-team field. Updates automatically each Tuesday after his new projection comes out.</p>`;
+  wireBracketSearch(el, idx, look);
+}
+function wireBracketSearch(el, idx, look){
+  const q = el.querySelector("#bk-q"), sugg = el.querySelector("#bk-sugg"), result = el.querySelector("#bk-result");
+  // Everyone searchable: all D-I teams from the standings data, plus any bracket name
+  const pool = new Map();
+  for(const rows of Object.values(stData||{})) for(const r of rows) pool.set(normName(r.school), {name:r.school, abbr:r.abbr, conf:r.conf});
+  for(const k of Object.keys(idx)) if(!pool.has(k)) pool.set(k, {name:idx[k].name, abbr:"", conf:""});
+  const matches = text => {
+    const t = normName(text); if(!t) return [];
+    const scored = [];
+    for(const [k,v] of pool){
+      const ab = (v.abbr||"").toLowerCase();
+      const sc = k===t||ab===t ? 0 : k.startsWith(t) ? 1 : ab.startsWith(t) ? 2 : k.split(/[\s()-]+/).some(w=>w.startsWith(t)) ? 3 : k.includes(t) ? 4 : -1;
+      if(sc>=0) scored.push([sc,k,v]);
+    }
+    return scored.sort((a,b)=>a[0]-b[0]||a[2].name.localeCompare(b[2].name)).slice(0,8);
+  };
+  const show = key => {
+    bkPick = key; sugg.hidden = true;
+    const info = idx[key], v = pool.get(key) || {name:key, conf:""};
+    const t = look(v.name);
+    const head = `<div class="bk-r-head">${t?logoHTML(t):""}<b>${esc(v.name)}</b>${v.conf?`<span>${esc(v.conf)}</span>`:""}</div>`;
+    let body;
+    if(info && info.seed){
+      const opp = info.opp.length>1 ? `the winner of No. ${info.oSeed} ${info.opp.map(esc).join(" / ")}` : `No. ${info.oSeed} ${esc(info.opp[0])}`;
+      body = `<p class="bk-r-main in">No. ${info.seed} seed · ${esc(info.region)} region</p>
+        <p>${info.partner ? `Opening round vs. ${esc(info.partner)}, then plays ${opp}` : `First game vs. ${opp}`} in ${esc(info.pod)}. Region final in ${esc(info.regionSite)}.</p>
+        ${info.aq ? `<p>${aqMark(info.aq)} ${info.aq==="confirmed"?"Clinched":"Projected"} automatic bid${v.conf?` as ${esc(v.conf)} champion`:""}.</p>` : `<p>At-large bid.</p>`}
+        ${info.bubble && !info.out ? `<p>On the bubble: ${esc(info.bubble.toLowerCase())}.</p>` : ""}
+        <button class="bk-r-go" type="button">Show in bracket</button>`;
+    } else if(info && info.out){
+      body = `<p class="bk-r-main bubble">Out · ${esc(info.bubble)}</p><p>Just missing the field in Lunardi's projection.</p>`;
+    } else {
+      body = `<p class="bk-r-main outx">Not in the projection</p><p>${esc(v.name)} isn't in the field or on Lunardi's bubble lists.</p>`;
+    }
+    result.innerHTML = `<div class="bk-r">${head}${body}</div>`;
+    el.querySelectorAll(".bk-team.hit").forEach(x=>x.classList.remove("hit"));
+    el.querySelectorAll(`.bk-team[data-team="${CSS.escape(key)}"]`).forEach(x=>x.classList.add("hit"));
+    const go = result.querySelector(".bk-r-go");
+    if(go) go.addEventListener("click", ()=>{ const hit = el.querySelector(".bk-regions .bk-team.hit"); if(hit) hit.closest(".bk-game").scrollIntoView({behavior:"smooth", block:"center"}); });
+  };
+  const drawSugg = () => {
+    const m = matches(q.value);
+    sugg.innerHTML = m.map(([,k,v])=>{ const info = idx[k];
+      const tag = info && info.seed ? `No. ${info.seed} · ${info.region}` : info && info.out ? info.bubble : "Not in";
+      return `<button type="button" role="option" class="bk-s" data-k="${esc(k)}"><span>${esc(v.name)}</span><small class="${info&&info.seed?"in":""}">${esc(tag)}</small></button>`; }).join("");
+    sugg.hidden = !m.length || !q.value.trim();
+  };
+  q.addEventListener("input", ()=>{ bkQuery = q.value; drawSugg(); if(!q.value.trim()){ bkPick=null; result.innerHTML=""; el.querySelectorAll(".bk-team.hit").forEach(x=>x.classList.remove("hit")); } });
+  q.addEventListener("focus", drawSugg);
+  q.addEventListener("keydown", e=>{ if(e.key==="Enter"){ const m = matches(q.value); if(m.length){ q.value = bkQuery = m[0][2].name; show(m[0][1]); q.blur(); } } if(e.key==="Escape") sugg.hidden = true; });
+  sugg.addEventListener("click", e=>{ const b = e.target.closest(".bk-s"); if(!b) return; const v = pool.get(b.dataset.k); q.value = bkQuery = v.name; show(b.dataset.k); q.blur(); });
+  document.addEventListener("click", e=>{ if(!e.target.closest(".bk-search")) sugg.hidden = true; });
+  if(bkPick) show(bkPick);
 }
 function renderConfStrip(){
   document.getElementById("confs").innerHTML = CONF_ORDER.map(c => c
