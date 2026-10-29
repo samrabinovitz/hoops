@@ -88,6 +88,8 @@ main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
 .notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px;padding:10px 14px;border-radius:10px;
   background:var(--chip);color:var(--fg);font-size:13px}
 .notice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer}
+.count{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--muted)}
+.count b{font-family:var(--display);font-size:20px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
 .section-label{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:22px}
 @media (max-width:360px){.grid{grid-template-columns:1fr}}
@@ -410,7 +412,9 @@ function render(){
     html += `<h2 class="section-label">${label} · ${list.length}</h2><div class="grid">${list.map(box).join("")}</div>`;
   }
   const day = dateFor(dayOff).toLocaleDateString([], {month:"short", day:"numeric"});
-  board.innerHTML = notice + (html || `<p class="empty">${games.length ? "No games match these filters" : "No games scheduled"} for ${day}.</p>`);
+  const visible = shown.filter(g=>!statuses.size||statuses.has(g.state)).length;
+  const count = games.length ? `<p class="count"><b>${visible}</b> ${visible===1?"game":"games"}${visible<games.length?` <span>of ${games.length}</span>`:""}</p>` : "";
+  board.innerHTML = notice + count + (html ||`<p class="empty">${games.length ? "No games match these filters" : "No games scheduled"} for ${day}.</p>`);
 }
 
 /* =========================================================================
