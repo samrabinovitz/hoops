@@ -118,6 +118,30 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .st-row.poll{grid-template-columns:24px minmax(0,1fr) 46px 66px 42px}
 .st-row.bpi{grid-template-columns:28px minmax(0,1fr) 54px 34px 44px 32px;gap:5px}
 .st-row.bpi .pconf{font-size:12px}
+/* Bracketology */
+.bk-regions{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.bk-region{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 12px 10px;min-width:0}
+.bk-region h3{display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 2px;font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.02em}
+.bk-region h3 small{font-family:var(--body);font-size:12px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0}
+.bk-site{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.bk-game{border:1px solid var(--line);border-radius:8px;margin-bottom:6px;overflow:hidden}
+.bk-slot{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:8px;padding:6px 10px;min-height:38px}
+.bk-slot+.bk-slot{border-top:1px solid var(--line)}
+.bk-slot.pair{grid-template-columns:24px minmax(0,1fr);background:var(--bg)}
+.bk-seed{font-family:var(--display);font-weight:700;font-size:16px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.bk-teams{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.bk-team{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.bk-team .logo{width:22px;height:22px;border-radius:5px;font-size:11px;flex:0 0 auto}
+.bk-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-or{font-size:12px;color:var(--muted)}
+.bk-tag{grid-column:2;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.bk-bubble-h{font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;margin:22px 0 10px}
+.bk-bubble{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bk-list{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.bk-list h4{margin:0;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.bk-list p{margin:2px 0 8px;font-size:12px;color:var(--muted)}
+.bk-list ol{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.bk-list .bk-name{font-size:14px}
 .st-row.bpi .st-team{gap:6px}
 .st-row .ap{color:var(--accent);font-family:var(--display);font-weight:700;font-size:17px}
 .st-head .ap{color:var(--muted)}
@@ -234,23 +258,40 @@ const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conf
    As of his update on 10/27/26. Next: Nov. 10, then weekly on Tuesdays.
    ========================================================================= */
 const BRACKET_UPDATED = "Oct 27, 2026";
+// The bracket, region by region. Each region has 4 sites ("pods"); each pod has 2 games, in bracket order.
+// A game is [[seed, team], [seed, team]]; an opening-round pair is [seed, teamA, teamB].
+const BRACKET = {
+  regions: [
+    {name:"South", site:"San Antonio", pods:[
+      {site:"Charlotte",  games:[[[1,"Florida"],[16,"Central Arkansas","Howard"]], [[8,"Auburn"],[9,"Indiana"]]]},
+      {site:"Sacramento", games:[[[5,"Texas Tech"],[12,"Wichita State"]], [[4,"Miami"],[13,"Santa Clara"]]]},
+      {site:"Omaha",      games:[[[6,"Vanderbilt"],[11,"Saint Louis"]], [[3,"Kansas"],[14,"UC San Diego"]]]},
+      {site:"Pittsburgh", games:[[[7,"Villanova"],[10,"Iowa","Georgia"]], [[2,"Michigan State"],[15,"Montana State","Wright State"]]]}]},
+    {name:"Midwest", site:"Kansas City", pods:[
+      {site:"Louisville",  games:[[[1,"Illinois"],[16,"Queens","Tennessee State"]], [[8,"Missouri"],[9,"North Carolina"]]]},
+      {site:"Minneapolis", games:[[[5,"Alabama"],[12,"NC State","Utah State"]], [[4,"St. John's"],[13,"McNeese"]]]},
+      {site:"Louisville",  games:[[[6,"Kentucky"],[11,"Clemson","Providence"]], [[3,"Virginia"],[14,"Liberty"]]]},
+      {site:"Fort Worth",  games:[[[7,"Purdue"],[10,"Baylor"]], [[2,"Houston"],[15,"Furman"]]]}]},
+    {name:"East", site:"New York", pods:[
+      {site:"Charlotte",  games:[[[1,"Duke"],[16,"Vermont","American"]], [[8,"Texas A&M"],[9,"Cincinnati"]]]},
+      {site:"Spokane",    games:[[[5,"Michigan"],[12,"Creighton","New Mexico"]], [[4,"Tennessee"],[13,"UNC Wilmington"]]]},
+      {site:"Omaha",      games:[[[6,"Nebraska"],[11,"Grand Canyon"]], [[3,"Iowa State"],[14,"Harvard"]]]},
+      {site:"Pittsburgh", games:[[[7,"Ohio State"],[10,"TCU","VCU"]], [[2,"UConn"],[15,"James Madison","Merrimack"]]]}]},
+    {name:"West", site:"Los Angeles", pods:[
+      {site:"Sacramento",  games:[[[1,"Arizona"],[16,"Bethune-Cookman","Long Island"]], [[8,"USC"],[9,"Marquette"]]]},
+      {site:"Minneapolis", games:[[[5,"Arkansas"],[12,"High Point"]], [[4,"Louisville"],[13,"Miami (OH)"]]]},
+      {site:"Fort Worth",  games:[[[6,"UCLA"],[11,"Oklahoma","West Virginia"]], [[3,"Texas"],[14,"Murray State"]]]},
+      {site:"Spokane",     games:[[[7,"BYU"],[10,"Wisconsin"]], [[2,"Gonzaga"],[15,"North Dakota State"]]]}]}
+  ],
+  lastFourByes:  ["Indiana","Cincinnati","Baylor","Wisconsin"],
+  lastFourIn:    ["Providence","Utah State","Creighton","New Mexico"],
+  firstFourOut:  ["Maryland","Virginia Tech","LSU","Oklahoma State"],
+  nextFourOut:   ["Florida State","Xavier","SMU","Ole Miss"]
+};
+// Every team the Bracketology filter counts: the projected field + first four out + next four out
 const BRACKET_FIELD = [
-  // South
-  "Florida","Central Arkansas","Howard","Auburn","Indiana","Texas Tech","Wichita State","Miami","Santa Clara","Vanderbilt","Saint Louis",
-  "Kansas","UC San Diego","Villanova","Iowa","Georgia","Michigan State","Montana State","Wright State",
-  // Midwest
-  "Illinois","Queens","Tennessee State","Missouri","North Carolina","Alabama","NC State","Utah State","St. John's","McNeese","Kentucky",
-  "Clemson","Providence","Virginia","Liberty","Purdue","Baylor","Houston","Furman",
-  // East
-  "Duke","Vermont","American","Texas A&M","Cincinnati","Michigan","Creighton","New Mexico","Tennessee","UNC Wilmington","Nebraska",
-  "Grand Canyon","Iowa State","Harvard","Ohio State","TCU","VCU","UConn","James Madison","Merrimack",
-  // West
-  "Arizona","Bethune-Cookman","Long Island","USC","Marquette","Arkansas","High Point","Louisville","Miami (OH)","UCLA","Oklahoma",
-  "West Virginia","Texas","Murray State","BYU","Wisconsin","Gonzaga","North Dakota State",
-  // First four out
-  "Maryland","Virginia Tech","LSU","Oklahoma State",
-  // Next four out
-  "Florida State","Xavier","SMU","Ole Miss"];
+  ...BRACKET.regions.flatMap(r => r.pods.flatMap(p => p.games.flatMap(g => g.flatMap(side => side.slice(1))))),
+  ...BRACKET.firstFourOut, ...BRACKET.nextFourOut];
 // Other spellings ESPN may use for the same schools
 const BRACKET_ALIASES = {"long island university":"long island","liu":"long island","queens university":"queens","mcneese state":"mcneese",
   "connecticut":"uconn","miami (fl)":"miami","miami fl":"miami","miami oh":"miami (oh)","miami (ohio)":"miami (oh)","saint johns":"st johns",
@@ -601,9 +642,9 @@ document.getElementById("board").addEventListener("click", e=>{
    ========================================================================= */
 const STANDINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/v2/sports/basketball/mens-college-basketball/standings";
 const RANKINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball/rankings";
-const TOP25 = "Top 25", BPI = "BPI";
+const TOP25 = "Top 25", BPI = "BPI", BRACKETOLOGY = "Bracketology";
 const BPI_FEED = "https://site.web.api.espn.com/apis/fitt/v3/sports/basketball/mens-college-basketball/powerindex?limit=400&region=us&lang=en";
-const CONF_ORDER = [TOP25, BPI, null, ...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // AP poll first, then the filter's conference order
+const CONF_ORDER = [TOP25, BPI, BRACKETOLOGY, null, ...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // AP poll first, then the filter's conference order
 const CONF_LIST = CONF_ORDER.filter(Boolean);
 let view = "scores";                 // "scores" or "standings"
 let stConf = CONF_LIST[0];           // conference shown on the standings page
@@ -737,6 +778,31 @@ function renderBPI(el, notice){
     <div class="table" role="table" aria-label="ESPN BPI"><div class="st-row bpi st-head"><span class="num">#</span><span>Team</span><span>Conf</span><span class="num">W-L</span><span class="num">BPI</span><span class="num">7D</span></div>${body}</div>
     <p class="st-note">BPI is ESPN's power rating: how many points better than an average Division I team on a neutral court. 7D is the change in rank over the last week.</p>`;
 }
+// Lunardi's projected bracket, drawn from BRACKET (logos and AP ranks come from the standings data)
+function renderBracket(el){
+  const byName = {};
+  for(const rows of Object.values(stData||{})) for(const r of rows) byName[normName(r.school)] = r;
+  const look = n => byName[normName(n)] || null;
+  const teamHTML = n => { const t = look(n), rank = t && apRanks[t.id];
+    return `<span class="bk-team">${t ? logoHTML(t) : `<span class="logo" aria-hidden="true" style="--tc1:var(--chip);--tc2:var(--line)"></span>`}${rank?`<span class="rank">${rank}</span>`:""}<span class="bk-name">${esc(n)}</span></span>`; };
+  const slot = side => { const [seed, ...teams] = side;
+    return `<div class="bk-slot${teams.length>1?" pair":""}"><span class="bk-seed">${seed}</span><div class="bk-teams">${teams.map(teamHTML).join(`<span class="bk-or">or</span>`)}</div>${teams.length>1?`<span class="bk-tag">Opening round</span>`:""}</div>`; };
+  const regions = BRACKET.regions.map(r=>`<section class="bk-region" aria-label="${esc(r.name)} region">
+      <h3><span>${esc(r.name)}</span><small>${esc(r.site)}</small></h3>
+      ${r.pods.map(pd=>`<div class="bk-pod"><div class="bk-site">${esc(pd.site)}</div>${pd.games.map(g=>`<div class="bk-game">${slot(g[0])}${slot(g[1])}</div>`).join("")}</div>`).join("")}
+    </section>`).join("");
+  const list = (title, sub, names) => `<div class="bk-list"><h4>${title}</h4><p>${sub}</p><ol>${names.map(n=>`<li>${teamHTML(n)}</li>`).join("")}</ol></div>`;
+  el.innerHTML = `<div class="st-title"><h2>Bracketology</h2><span>Lunardi · ${esc(BRACKET_UPDATED.replace(/,\s*\d{4}$/,""))}</span></div>
+    <div class="bk-regions">${regions}</div>
+    <h3 class="bk-bubble-h">On the bubble</h3>
+    <div class="bk-bubble">
+      ${list("Last four byes","Last teams to skip the opening round",BRACKET.lastFourByes)}
+      ${list("Last four in","Last teams to make the field",BRACKET.lastFourIn)}
+      ${list("First four out","Teams 77–80",BRACKET.firstFourOut)}
+      ${list("Next four out","Teams 81–84",BRACKET.nextFourOut)}
+    </div>
+    <p class="st-note">Joe Lunardi's projected 76-team field. Updates automatically each Tuesday after his new projection comes out.</p>`;
+}
 function renderConfStrip(){
   document.getElementById("confs").innerHTML = CONF_ORDER.map(c => c
     ? `<button class="conf-chip" id="cs-${c.replace(/\W/g,"")}" data-conf="${esc(c)}" aria-pressed="${c===stConf}">${esc(c)}</button>`
@@ -754,6 +820,7 @@ function renderStandings(){
   const updated0 = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
   if(stConf===TOP25){ renderPoll(el, notice, updated0); return; }
   if(stConf===BPI){ renderBPI(el, notice); return; }
+  if(stConf===BRACKETOLOGY){ renderBracket(el); return; }
   const rows = stData[stConf] || [];
   const started = rows.some(r=>r.ovr!=="0-0");
   const updated = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
