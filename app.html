@@ -323,9 +323,9 @@ let mode = "live";                       // "live" or "sample"
 let games = [];                          // games for the selected day
 let loading = true, lastUpdated = null, timer = null, reqId = 0;
 let confs = new Set(), statuses = new Set(), tvs = new Set(), bothTeams = false; // every filter starts on All
-try{ const s = JSON.parse(localStorage.getItem("hoops-filters-v3")||"null");
-  if(s){ confs=new Set(s.confs||[]); statuses=new Set(s.statuses||[]); tvs=new Set(s.tvs||[]); bothTeams=!!s.both; } }catch(e){}
-function saveFilters(){ try{ localStorage.setItem("hoops-filters-v3", JSON.stringify({confs:[...confs],statuses:[...statuses],tvs:[...tvs],both:bothTeams})) }catch(e){} }
+// Filters live only while the app is open; closing it resets them to All.
+try{ localStorage.removeItem("hoops-filters-v3"); localStorage.removeItem("hoops-filters-v2"); }catch(e){} // clear picks saved by older versions
+function saveFilters(){}
 
 const ymd = d => d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
 
