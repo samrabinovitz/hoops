@@ -507,7 +507,7 @@ function centerDate(smooth){
   const strip=document.getElementById("dates"), b=document.getElementById("d"+(dayOff-FIRST_OFF)); if(!b) return;
   strip.scrollTo({left:b.offsetLeft-strip.clientWidth/2+b.offsetWidth/2, behavior:smooth&&!matchMedia("(prefers-reduced-motion: reduce)").matches?"smooth":"auto"});
 }
-function goTo(off){ dayOff=Math.max(FIRST_OFF,Math.min(LAST_OFF,off)); games=[]; centerDate(true); load(); }
+function goTo(off){ dayOff=Math.max(FIRST_OFF,Math.min(LAST_OFF,off)); games=[]; window.scrollTo(0,0); centerDate(true); load(); } // new day starts at the first game
 document.getElementById("dates").addEventListener("click", e=>{
   const b = e.target.closest(".date"); if(!b) return;
   goTo(+b.dataset.off);
