@@ -24,14 +24,24 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
-.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:14px 8px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px 8px}
+.tools{display:flex;align-items:center;gap:8px;min-width:0}
+.today-btn{border:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;padding:4px 10px;border-radius:999px;cursor:pointer}
+.cal{position:relative;display:grid;place-items:center;width:34px;height:30px;border:1px solid var(--line);border-radius:8px;color:var(--fg);background:var(--chip)}
+.cal svg{width:17px;height:17px;pointer-events:none}
+.cal input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0;font-size:16px}
+.cal:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.today-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 h1{margin:0;font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:.01em;text-transform:uppercase}
 h1 span{color:var(--accent)}
 .updated{border:0;background:transparent;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;padding:2px 0}
 .updated:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.dates{display:flex;gap:6px;overflow-x:auto;padding-block:4px 10px;scrollbar-width:none}
+.dates{position:relative;display:flex;align-items:stretch;gap:6px;overflow-x:auto;padding-block:4px 10px;scrollbar-width:none}
 .dates::-webkit-scrollbar{display:none}
+.mon{flex:0 0 auto;align-self:center;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--display);font-weight:700;font-size:12px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding:4px 0;border-left:1px solid var(--line);padding-left:6px}
 .date{flex:0 0 auto;min-width:58px;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;
   padding:6px 10px;border-radius:8px;display:grid;justify-items:center;line-height:1.1}
 .date b{font-family:var(--display);font-size:13px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
@@ -110,7 +120,16 @@ main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
 
 <header>
   <div class="wrap">
-    <div class="top"><h1>Hoops<span>.</span></h1><button class="updated" id="updated" title="Refresh now">Loading…</button></div>
+    <div class="top"><h1>Hoops<span>.</span></h1>
+      <div class="tools">
+        <button class="updated" id="updated" title="Refresh now">Loading…</button>
+        <button class="today-btn" id="today-btn" hidden>Today</button>
+        <label class="cal" title="Jump to a date"><span class="vh">Jump to a date</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <input type="date" id="jump">
+        </label>
+      </div>
+    </div>
     <nav class="dates" id="dates" aria-label="Choose a date"></nav>
     <div class="filterbar" id="filterbar">
       <button class="dd-btn" id="btn-conf" data-panel="conf-row" aria-expanded="false" aria-controls="conf-row"><span class="dd-k">Conference</span><span class="dd-v" id="sum-conf">All</span></button>
@@ -293,7 +312,12 @@ function sampleGames(off){
 /* =========================================================================
    STATE
    ========================================================================= */
-const DAY_RANGE = 7;                     // days shown before and after today
+// Whole season in the date strip: Oct 15 through Apr 15 (covers exhibitions through the national title game)
+const dateFor = off => { const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+off); return d; };
+const offFor = d => { const t=dateFor(0), x=new Date(d); x.setHours(12,0,0,0); return Math.round((x-t)/864e5); };
+const SEASON_YEAR = (()=>{ const n=new Date(); return n.getMonth()>=6 ? n.getFullYear() : n.getFullYear()-1; })();
+const FIRST_OFF = Math.min(0, offFor(new Date(SEASON_YEAR,9,15)));
+const LAST_OFF = Math.max(0, offFor(new Date(SEASON_YEAR+1,3,15)));
 let dayOff = 0;                          // selected day, as offset from today
 let mode = "live";                       // "live" or "sample"
 let games = [];                          // games for the selected day
@@ -303,7 +327,6 @@ try{ const s = JSON.parse(localStorage.getItem("hoops-filters-v3")||"null");
   if(s){ confs=new Set(s.confs||[]); statuses=new Set(s.statuses||[]); tvs=new Set(s.tvs||[]); bothTeams=!!s.both; } }catch(e){}
 function saveFilters(){ try{ localStorage.setItem("hoops-filters-v3", JSON.stringify({confs:[...confs],statuses:[...statuses],tvs:[...tvs],both:bothTeams})) }catch(e){} }
 
-const dateFor = off => { const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+off); return d; };
 const ymd = d => d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
 
 /* =========================================================================
@@ -363,15 +386,19 @@ function summary(set, chips){
 }
 function renderDates(){
   const el = document.getElementById("dates"); let html="";
-  for(let off=-DAY_RANGE; off<=DAY_RANGE; off++){
+  let lastMonth = -1;
+  for(let off=FIRST_OFF; off<=LAST_OFF; off++){
     const d = dateFor(off);
+    if(d.getMonth()!==lastMonth){ lastMonth=d.getMonth(); html += `<span class="mon" aria-hidden="true">${d.toLocaleDateString([], {month:"short"})}</span>`; }
     const label = off===0 ? "Today" : d.toLocaleDateString([], {weekday:"short"});
-    html += `<button class="date" id="d${off+DAY_RANGE}" data-off="${off}" aria-pressed="${off===dayOff}" aria-label="${d.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"})}"><b>${label}</b><i>${d.getDate()}</i></button>`;
+    html += `<button class="date" id="d${off-FIRST_OFF}" data-off="${off}" aria-pressed="${off===dayOff}" aria-label="${d.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"})}"><b>${label}</b><i>${d.getDate()}</i></button>`;
   }
   el.innerHTML = html;
 }
 function render(){
   document.querySelectorAll(".date").forEach(b=>b.setAttribute("aria-pressed", +b.dataset.off===dayOff));
+  document.getElementById("today-btn").hidden = dayOff===0;
+  const jd = dateFor(dayOff); document.getElementById("jump").value = `${jd.getFullYear()}-${String(jd.getMonth()+1).padStart(2,"0")}-${String(jd.getDate()).padStart(2,"0")}`;
   document.querySelectorAll(".filter").forEach(b=>{ const set=rowSet(b.dataset.row);
     b.setAttribute("aria-pressed", b.dataset.v==="all" ? !set.size : set.has(b.dataset.v)); });
   document.getElementById("both").setAttribute("aria-pressed", bothTeams);
@@ -460,9 +487,18 @@ document.addEventListener("click", e=>{ if(!e.target.closest(".filterbar")) clos
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeAll(); });
 addEventListener("resize", closeAll); addEventListener("scroll", closeAll, {passive:true});
 
+function centerDate(smooth){
+  const strip=document.getElementById("dates"), b=document.getElementById("d"+(dayOff-FIRST_OFF)); if(!b) return;
+  strip.scrollTo({left:b.offsetLeft-strip.clientWidth/2+b.offsetWidth/2, behavior:smooth&&!matchMedia("(prefers-reduced-motion: reduce)").matches?"smooth":"auto"});
+}
+function goTo(off){ dayOff=Math.max(FIRST_OFF,Math.min(LAST_OFF,off)); games=[]; centerDate(true); load(); }
 document.getElementById("dates").addEventListener("click", e=>{
   const b = e.target.closest(".date"); if(!b) return;
-  dayOff = +b.dataset.off; games = []; load();
+  goTo(+b.dataset.off);
+});
+document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
+document.getElementById("jump").addEventListener("change", e=>{
+  const v=e.target.value; if(!v) return; const [y,m,d]=v.split("-").map(Number); goTo(offFor(new Date(y,m-1,d)));
 });
 document.getElementById("updated").addEventListener("click", ()=>{ if(mode==="live") load(); });
 document.getElementById("board").addEventListener("click", e=>{
@@ -470,7 +506,9 @@ document.getElementById("board").addEventListener("click", e=>{
 });
 
 renderDates();
-document.getElementById("d"+DAY_RANGE).scrollIntoView({inline:"center", block:"nearest"});
+{ const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const j=document.getElementById("jump"); j.min=iso(dateFor(FIRST_OFF)); j.max=iso(dateFor(LAST_OFF)); }
+centerDate(false);
 load();
 
 // Installed as a phone app: keep the app shell available offline
