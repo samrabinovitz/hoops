@@ -170,23 +170,33 @@ const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conf
   "Missouri Valley","NEC","OVC","Patriot","SoCon","Southland","Summit","Sun Belt","SWAC","UAC"];
 
 /* =========================================================================
-   BRACKETOLOGY (Joe Lunardi, ESPN) — projected field + first four out + next four out.
-   As of the May 2026 projection. Update this list when he releases a new one.
+   BRACKETOLOGY (Joe Lunardi, ESPN) — projected 76-team field + first four out + next four out.
+   As of his update on 10/27/26. Next: Nov. 10, then weekly on Tuesdays.
    ========================================================================= */
-const BRACKET_FIELD = ["Florida","Long Island","Vermont","Wisconsin","North Carolina","St. John's","Santa Clara","USC","Yale","Vanderbilt","VCU","Providence",
-  "Virginia","Illinois State","Indiana","Texas A&M","UConn","East Tennessee State","Illinois","Southeast Missouri State","Southern","Kentucky","Saint Louis",
-  "Iowa State","High Point","Alabama","McNeese","Nebraska","Arizona State","Clemson","Gonzaga","St. Thomas","Missouri","Creighton","Arizona","UC Santa Barbara",
-  "Michigan","Montana State","Howard","Auburn","NC State","Tennessee","Marquette","Stanford","Kansas","Wichita State","Texas Tech","LSU","Oregon","Louisville","Akron",
-  "Villanova","UCLA","Arkansas","Robert Morris","Navy","Duke","Troy","Merrimack","Georgia","Ohio State","Purdue","TCU","Oklahoma","Houston","UNC Wilmington",
-  "BYU","New Mexico","Texas","Liberty","Miami","Iowa","Baylor","Michigan State","Queens","Austin Peay",
+const BRACKET_UPDATED = "Oct 27, 2026";
+const BRACKET_FIELD = [
+  // South
+  "Florida","Central Arkansas","Howard","Auburn","Indiana","Texas Tech","Wichita State","Miami","Santa Clara","Vanderbilt","Saint Louis",
+  "Kansas","UC San Diego","Villanova","Iowa","Georgia","Michigan State","Montana State","Wright State",
+  // Midwest
+  "Illinois","Queens","Tennessee State","Missouri","North Carolina","Alabama","NC State","Utah State","St. John's","McNeese","Kentucky",
+  "Clemson","Providence","Virginia","Liberty","Purdue","Baylor","Houston","Furman",
+  // East
+  "Duke","Vermont","American","Texas A&M","Cincinnati","Michigan","Creighton","New Mexico","Tennessee","UNC Wilmington","Nebraska",
+  "Grand Canyon","Iowa State","Harvard","Ohio State","TCU","VCU","UConn","James Madison","Merrimack",
+  // West
+  "Arizona","Bethune-Cookman","Long Island","USC","Marquette","Arkansas","High Point","Louisville","Miami (OH)","UCLA","Oklahoma",
+  "West Virginia","Texas","Murray State","BYU","Wisconsin","Gonzaga","North Dakota State",
   // First four out
-  "West Virginia","Florida State","Utah State","Maryland",
+  "Maryland","Virginia Tech","LSU","Oklahoma State",
   // Next four out
-  "Mississippi State","Xavier","Virginia Tech","Oklahoma State"];
+  "Florida State","Xavier","SMU","Ole Miss"];
 // Other spellings ESPN may use for the same schools
-const BRACKET_ALIASES = {"long island university":"long island","liu":"long island","st thomas-minnesota":"st thomas","st thomas (mn)":"st thomas",
-  "se missouri state":"southeast missouri state","southeast missouri st":"southeast missouri state","queens university":"queens","mcneese state":"mcneese",
-  "connecticut":"uconn","miami (fl)":"miami","miami hurricanes":"miami","saint johns":"st johns","st johns (ny)":"st johns","texas a&m":"texas aandm"};
+const BRACKET_ALIASES = {"long island university":"long island","liu":"long island","queens university":"queens","mcneese state":"mcneese",
+  "connecticut":"uconn","miami (fl)":"miami","miami fl":"miami","miami oh":"miami (oh)","miami (ohio)":"miami (oh)","saint johns":"st johns",
+  "st johns (ny)":"st johns","american university":"american","bethune cookman":"bethune-cookman","b-cu":"bethune-cookman",
+  "c arkansas":"central arkansas","n dakota st":"north dakota state","north dakota st":"north dakota state","mississippi":"ole miss",
+  "uc san diego tritons":"uc san diego","ucsd":"uc san diego","north carolina state":"nc state","southern methodist":"smu"};
 const normName = s => { let n=(s||"").toLowerCase().replace(/[.'’]/g,"").replace(/&/g,"and").replace(/\s+/g," ").trim(); return BRACKET_ALIASES[n]||n; };
 const BRACKET_SET = new Set(BRACKET_FIELD.map(normName));
 
@@ -197,14 +207,15 @@ const BRACKET_SET = new Set(BRACKET_FIELD.map(normName));
 const NET_TYPE = {ABC:"bc",CBS:"bc",FOX:"bc",NBC:"bc",
   ESPN:"cable",ESPN2:"cable",ESPNU:"cable",ESPNEWS:"cable",FS1:"cable",FS2:"cable",TNT:"cable",truTV:"cable",USA:"cable",CBSSN:"cable",
   ACCN:"conf",SECN:"conf",BTN:"conf",
-  "ESPN+":"stream",Peacock:"stream","Paramount+":"stream","SECN+":"stream",ACCNX:"stream","B1G+":"stream",FloHoops:"stream"};
+  "ESPN+":"stream",Peacock:"stream","Paramount+":"stream","SECN+":"stream",ACCNX:"stream","B1G+":"stream",FloHoops:"stream",
+  "MW+":"stream",YouTube:"stream","NEC Front Row":"stream","Midco Sports Plus":"stream"};
 const TV_ALIAS = {"acc network":"ACCN","accn":"ACCN","sec network":"SECN","secn":"SECN","big ten network":"BTN","btn":"BTN",
   "cbs sports network":"CBSSN","cbs sports net":"CBSSN","cbssn":"CBSSN","usa net":"USA","usa network":"USA","usa":"USA","trutv":"truTV",
   "peacock":"Peacock","espn+":"ESPN+","sec network +":"SECN+","sec network+":"SECN+","secn+":"SECN+","accnx":"ACCNX","acc network extra":"ACCNX",
   "b1g+":"B1G+","paramount+":"Paramount+","flohoops":"FloHoops","flosports":"FloHoops","fox":"FOX","fs1":"FS1","fs2":"FS2","espn":"ESPN","espn2":"ESPN2",
   "espnu":"ESPNU","espnews":"ESPNEWS","cbs":"CBS","abc":"ABC","nbc":"NBC","tnt":"TNT"};
 const normTV = n => TV_ALIAS[(n||"").trim().toLowerCase()] || (n||"").trim();
-const netType = n => NET_TYPE[n] || (/\+|flo|stream|app/i.test(n) ? "stream" : "cable"); // unknown regional channels count as cable
+const netType = n => NET_TYPE[n] || (/\+|plus|flo|stream|app|youtube|front row/i.test(n) ? "stream" : "cable"); // unknown regional channels count as cable
 const TYPE_ORDER = {bc:0,cable:1,conf:2,stream:3};
 const isAlt = n => { const t=netType(n); return t==="conf"||t==="stream"; };
 
