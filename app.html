@@ -106,7 +106,7 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .st-head{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-block:9px 7px;background:var(--chip)}
 .st-row .num{text-align:right;white-space:nowrap}
 .st-row .pos{color:var(--muted);font-weight:600;font-size:13px}
-.st-team{display:flex;align-items:center;gap:8px;min-width:0}
+.st-team{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden}
 .st-team .logo{width:26px;height:26px;border-radius:6px;font-size:13px;flex:0 0 auto}
 .st-team .abbr{font-size:18px}
 .st-team .full{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -116,6 +116,9 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .st-note{margin:10px 2px 0;font-size:13px;color:var(--muted);line-height:1.45}
 .st-note b{color:var(--fg);font-weight:700}
 .st-row.poll{grid-template-columns:24px minmax(0,1fr) 46px 66px 42px}
+.st-row.bpi{grid-template-columns:28px minmax(0,1fr) 54px 34px 44px 32px;gap:5px}
+.st-row.bpi .pconf{font-size:12px}
+.st-row.bpi .st-team{gap:6px}
 .st-row .ap{color:var(--accent);font-family:var(--display);font-weight:700;font-size:17px}
 .st-head .ap{color:var(--muted)}
 .fpv{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -598,12 +601,13 @@ document.getElementById("board").addEventListener("click", e=>{
    ========================================================================= */
 const STANDINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/v2/sports/basketball/mens-college-basketball/standings";
 const RANKINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball/rankings";
-const TOP25 = "Top 25";
-const CONF_ORDER = [TOP25, null, ...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // AP poll first, then the filter's conference order
+const TOP25 = "Top 25", BPI = "BPI";
+const BPI_FEED = "https://site.web.api.espn.com/apis/fitt/v3/sports/basketball/mens-college-basketball/powerindex?limit=400&region=us&lang=en";
+const CONF_ORDER = [TOP25, BPI, null, ...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // AP poll first, then the filter's conference order
 const CONF_LIST = CONF_ORDER.filter(Boolean);
 let view = "scores";                 // "scores" or "standings"
 let stConf = CONF_LIST[0];           // conference shown on the standings page
-let stData = null, stUpdated = null, stLoading = false, stFailed = false, apRanks = {}, apPoll = null;
+let stData = null, stUpdated = null, stLoading = false, stFailed = false, apRanks = {}, apPoll = null, bpiData = null, bpiLoading = false, bpiFailed = false;
 
 const statOf = (e, type) => { const s=(e.stats||[]).find(x=>x.type===type); return s ? s.displayValue : ""; };
 function parseStandings(j){
@@ -693,6 +697,46 @@ function renderPoll(el, notice, updated){
   el.innerHTML = notice + `<div class="st-title"><h2>Top 25</h2><span>AP · ${esc(poll.label)}</span></div>
     <div class="table" role="table" aria-label="AP Top 25"><div class="st-row poll st-head"><span class="num">#</span><span>Team</span><span class="num">Rec</span><span>Conf</span><span class="num">Chg</span></div>${body}</div>` + extra;
 }
+// ESPN Basketball Power Index: every D-I team, rated. Loaded only when the BPI page is opened (large download).
+async function loadBPI(){
+  if(bpiLoading) return; bpiLoading = true;
+  try{
+    const r = await fetch(BPI_FEED, {cache:"no-store"}); if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const names = ((j.categories||[]).find(c=>c.name==="bpi")||{}).names || [];
+    const ix = n => names.indexOf(n);
+    const confOf = {}; for(const rows of Object.values(stData||{})) for(const x of rows) confOf[x.id] = x.conf;
+    const rows = (j.teams||[]).map(t=>{
+      const v = ((t.categories||[]).find(c=>c.name==="bpi")||{}).values || [];
+      const tm = t.team||{}, get = n => ix(n)>=0 ? v[ix(n)] : null;
+      return {id:tm.id, abbr:tm.abbreviation||"", school:tm.shortDisplayName||tm.location||"", conf:confOf[tm.id]||"",
+        logo:(tm.logos&&tm.logos[0]&&tm.logos[0].href)||"", c1:tm.color?"#"+tm.color:"#5b6470", c2:"#ffffff",
+        rank:+get("bpirank")||0, bpi:get("bpi"), chg:+get("bpisevendaychangerank")||0,
+        rec:`${get("wins")??0}-${get("losses")??0}`};
+    }).filter(r=>r.rank).sort((a,b)=>a.rank-b.rank);
+    bpiData = {rows, updated: j.lastUpdated ? new Date(j.lastUpdated) : new Date()}; bpiFailed = false;
+  }catch(e){
+    if(!bpiData) bpiFailed = true;
+  }
+  bpiLoading = false; if(stConf===BPI) renderStandings();
+}
+function renderBPI(el, notice){
+  if(!bpiData){
+    el.innerHTML = notice + `<div class="st-title"><h2>BPI</h2><span>ESPN</span></div>` + (bpiFailed
+      ? `<p class="empty">Can't reach ESPN's BPI ratings right now.</p>`
+      : `<div class="skeleton" style="height:420px"></div>`);
+    if(!bpiFailed) loadBPI();
+    return;
+  }
+  const chg = c => !c ? `<span class="chg">–</span>` : c>0 ? `<span class="chg up">▲${c}</span>` : `<span class="chg down">▼${-c}</span>`;
+  const body = bpiData.rows.map(r=>`<div class="st-row bpi"><span class="num pos">${r.rank}</span>
+      <div class="st-team">${logoHTML(r)}${apRanks[r.id]?`<span class="rank">${apRanks[r.id]}</span>`:""}<span class="abbr">${esc(r.abbr)}</span><span class="full">${esc(r.school)}</span></div>
+      <span class="pconf">${esc(r.conf)}</span><span class="num">${esc(r.rec)}</span><span class="num cr">${r.bpi==null?"–":(r.bpi>0?"+":"")+Number(r.bpi).toFixed(1)}</span><span class="num">${chg(r.chg)}</span></div>`).join("");
+  const upd = bpiData.updated.toLocaleDateString([], {month:"short", day:"numeric"});
+  el.innerHTML = notice + `<div class="st-title"><h2>BPI</h2><span>ESPN · ${bpiData.rows.length} teams · ${upd}</span></div>
+    <div class="table" role="table" aria-label="ESPN BPI"><div class="st-row bpi st-head"><span class="num">#</span><span>Team</span><span>Conf</span><span class="num">W-L</span><span class="num">BPI</span><span class="num">7D</span></div>${body}</div>
+    <p class="st-note">BPI is ESPN's power rating: how many points better than an average Division I team on a neutral court. 7D is the change in rank over the last week.</p>`;
+}
 function renderConfStrip(){
   document.getElementById("confs").innerHTML = CONF_ORDER.map(c => c
     ? `<button class="conf-chip" id="cs-${c.replace(/\W/g,"")}" data-conf="${esc(c)}" aria-pressed="${c===stConf}">${esc(c)}</button>`
@@ -709,6 +753,7 @@ function renderStandings(){
   if(!stData){ el.innerHTML = `<div class="skeleton" style="height:420px"></div>`; return; }
   const updated0 = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
   if(stConf===TOP25){ renderPoll(el, notice, updated0); return; }
+  if(stConf===BPI){ renderBPI(el, notice); return; }
   const rows = stData[stConf] || [];
   const started = rows.some(r=>r.ovr!=="0-0");
   const updated = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
