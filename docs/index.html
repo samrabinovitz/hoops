@@ -22,16 +22,16 @@
 /* Layout: sticky header (title, date strip, three filter dropdowns), then a responsive grid of game boxes (1 col phone, 2-3 wide) */
 :root{
   --bg:#eef0f3; --surface:#ffffff; --fg:#14171c; --muted:#646b76; --line:#dde1e7;
-  --accent:#d9480f; --live:#d6283a; --chip:#e4e7ec;
+  --accent:#d9480f; --live:#d6283a; --chip:#e4e7ec; --up:#1d8a4a;
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0d1014; --surface:#171b21; --fg:#eef1f5; --muted:#8d95a1; --line:#262c35;
-  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; color-scheme:dark }}
+  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; --up:#3ecf7a; color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#0d1014; --surface:#171b21; --fg:#eef1f5; --muted:#8d95a1; --line:#262c35;
-  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; color-scheme:dark }
+  --accent:#f76f2e; --live:#ff4d5e; --chip:#222831; --up:#3ecf7a; color-scheme:dark }
 
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;-webkit-tap-highlight-color:transparent}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
@@ -129,7 +129,15 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .st-row .cr{font-weight:700}
 .st-row .strk.w{color:var(--fg)}
 .st-row .strk.l{color:var(--muted)}
-.st-note{margin:10px 2px 0;font-size:13px;color:var(--muted)}
+.st-note{margin:10px 2px 0;font-size:13px;color:var(--muted);line-height:1.45}
+.st-note b{color:var(--fg);font-weight:700}
+.st-row.poll{grid-template-columns:24px minmax(0,1fr) 46px 66px 42px}
+.st-row .ap{color:var(--accent);font-family:var(--display);font-weight:700;font-size:17px}
+.st-head .ap{color:var(--muted)}
+.fpv{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pconf{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chg{font-size:12px;font-weight:700;color:var(--muted)}
+.chg.up{color:var(--up)}.chg.down{color:var(--live)}.chg.new{color:var(--accent)}
 @media (max-width:600px){.st-team .full{display:none}}
 .notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px;padding:10px 14px;border-radius:10px;
   background:var(--chip);color:var(--fg);font-size:13px}
@@ -606,11 +614,12 @@ document.getElementById("board").addEventListener("click", e=>{
    ========================================================================= */
 const STANDINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/v2/sports/basketball/mens-college-basketball/standings";
 const RANKINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball/rankings";
-const CONF_ORDER = [...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // same order as the filter
+const TOP25 = "Top 25";
+const CONF_ORDER = [TOP25, null, ...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // AP poll first, then the filter's conference order
 const CONF_LIST = CONF_ORDER.filter(Boolean);
 let view = "scores";                 // "scores" or "standings"
 let stConf = CONF_LIST[0];           // conference shown on the standings page
-let stData = null, stUpdated = null, stLoading = false, stFailed = false, apRanks = {};
+let stData = null, stUpdated = null, stLoading = false, stFailed = false, apRanks = {}, apPoll = null;
 
 const statOf = (e, type) => { const s=(e.stats||[]).find(x=>x.type===type); return s ? s.displayValue : ""; };
 function parseStandings(j){
@@ -655,11 +664,50 @@ async function loadStandings(){
     apRanks = {};
     const ap = (rj.rankings||[]).find(r=>/^AP/i.test(r.name||"")) || (rj.rankings||[])[0];
     for(const r of (ap && ap.ranks)||[]) if(r.team && r.current<=25) apRanks[r.team.id] = r.current;
+    apPoll = ap ? parsePoll(ap) : null;
     stUpdated = new Date(); stFailed = false;
   }catch(e){
     if(!stData){ stData = sampleStandings(); stFailed = true; }
   }
   stLoading = false; renderStandings();
+}
+function parsePoll(ap){
+  const confOf = {}; for(const rows of Object.values(stData||{})) for(const r of rows) confOf[r.id] = r.conf;
+  const label = (ap.occurrence && ap.occurrence.displayValue) || "";
+  const pre = /pre/i.test(label);
+  const rows = (ap.ranks||[]).filter(r=>r.team).map(r=>{
+    const t=r.team, prev=+r.previous||0, cur=+r.current;
+    return {rank:cur, id:t.id, abbr:t.abbreviation||"", school:t.location||"", conf:confOf[t.id]||"",
+      logo:t.logo||(t.logos&&t.logos[0]&&t.logos[0].href)||"", c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
+      rec:r.recordSummary||"", fpv:+r.firstPlaceVotes||0, pts:+r.points||0,
+      chg: pre ? null : prev===0 ? "new" : prev-cur};
+  });
+  const others = (ap.others||[]).filter(o=>o.team).map(o=>({name:o.team.location||o.team.abbreviation, pts:+o.points||0}));
+  const dropped = (ap.droppedOut||[]).filter(o=>o.team).map(o=>o.team.location||o.team.abbreviation);
+  return {label: label==="Preseason" ? "Preseason poll" : label ? label : "", rows, others, dropped};
+}
+function samplePoll(){
+  const rows = Object.entries(S_RANK).sort((a,b)=>a[1]-b[1]).map(([abbr,rank])=>{ const [school,conf,c1,c2]=S_TEAMS[abbr];
+    return {rank, id:abbr, abbr, school, conf, logo:"", c1, c2, rec:S_REC[abbr].split(" ")[0], fpv:0, pts:0, chg:null}; });
+  return {label:"Sample poll", rows, others:[], dropped:[]};
+}
+function logoHTML(r, cls){
+  return r.logo
+    ? `<div class="logo has-img" style="--tc1:${esc(r.c1)};--tc2:${esc(r.c2)}" aria-hidden="true">${esc(r.abbr[0]||"")}<img src="${esc(r.logo)}" alt="" loading="lazy" onerror="this.parentNode.classList.remove('has-img');this.remove()"></div>`
+    : `<div class="logo" style="--tc1:${esc(r.c1)};--tc2:${esc(r.c2)}" aria-hidden="true">${esc(r.abbr[0]||"")}</div>`;
+}
+function renderPoll(el, notice, updated){
+  const poll = apPoll || (stFailed ? samplePoll() : null);
+  if(!poll || !poll.rows.length){ el.innerHTML = notice + `<div class="st-title"><h2>Top 25</h2><span>${updated}</span></div><p class="empty">The AP poll isn't available right now.</p>`; return; }
+  const chg = c => c===null ? `<span class="chg">–</span>` : c==="new" ? `<span class="chg new">NEW</span>`
+    : c>0 ? `<span class="chg up">▲${c}</span>` : c<0 ? `<span class="chg down">▼${-c}</span>` : `<span class="chg">–</span>`;
+  const body = poll.rows.map(r=>`<div class="st-row poll"><span class="num pos ap">${r.rank}</span>
+      <div class="st-team">${logoHTML(r)}<span class="abbr">${esc(r.abbr)}</span>${r.fpv?`<span class="fpv">(${r.fpv})</span>`:""}<span class="full">${esc(r.school)}</span></div>
+      <span class="num cr">${esc(r.rec)}</span><span class="pconf">${esc(r.conf)}</span><span class="num">${chg(r.chg)}</span></div>`).join("");
+  const extra = (poll.others.length ? `<p class="st-note"><b>Others receiving votes:</b> ${poll.others.map(o=>`${esc(o.name)} ${o.pts}`).join(", ")}</p>` : "")
+    + (poll.dropped.length ? `<p class="st-note"><b>Dropped out:</b> ${poll.dropped.map(esc).join(", ")}</p>` : "");
+  el.innerHTML = notice + `<div class="st-title"><h2>Top 25</h2><span>AP · ${esc(poll.label)}</span></div>
+    <div class="table" role="table" aria-label="AP Top 25"><div class="st-row poll st-head"><span class="num">#</span><span>Team</span><span class="num">Rec</span><span>Conf</span><span class="num">Chg</span></div>${body}</div>` + extra;
 }
 function renderConfStrip(){
   document.getElementById("confs").innerHTML = CONF_ORDER.map(c => c
@@ -675,6 +723,8 @@ function renderStandings(){
   const el = document.getElementById("standings");
   const notice = stFailed ? `<div class="notice"><span>Can't reach live standings here, so these are sample teams.</span></div>` : "";
   if(!stData){ el.innerHTML = `<div class="skeleton" style="height:420px"></div>`; return; }
+  const updated0 = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
+  if(stConf===TOP25){ renderPoll(el, notice, updated0); return; }
   const rows = stData[stConf] || [];
   const started = rows.some(r=>r.ovr!=="0-0");
   const updated = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
