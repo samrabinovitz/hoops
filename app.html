@@ -78,7 +78,43 @@ h1 span{color:var(--accent)}
 .toggle[aria-pressed="true"] .sw{background:var(--accent);box-shadow:none}
 .toggle[aria-pressed="true"] .sw::after{transform:translateX(10px);background:#fff}
 
-main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
+main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
+
+/* Bottom tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;gap:4px;background:var(--surface);border-top:1px solid var(--line);
+  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.tab{flex:1 1 0;max-width:200px;display:grid;justify-items:center;gap:2px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;padding:6px 0 4px;border-radius:10px;cursor:pointer}
+.tab svg{width:22px;height:22px}
+.tab[aria-current="page"]{color:var(--accent)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Standings */
+.confs{display:flex;align-items:center;gap:6px;overflow-x:auto;padding-block:4px 12px;scrollbar-width:none}
+.confs::-webkit-scrollbar{display:none}
+.conf-chip{flex:0 0 auto;border:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-size:14px;font-weight:700;padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.conf-chip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.conf-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.confs .sep{flex:0 0 auto;width:1px;height:20px;background:var(--line);margin:0 3px}
+.st-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 10px}
+.st-title h2{margin:0;font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;letter-spacing:.01em}
+.st-title span{font-size:12px;color:var(--muted)}
+.table{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.st-row{display:grid;grid-template-columns:22px minmax(0,1fr) 50px 56px 32px 40px;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid var(--line);
+  font-variant-numeric:tabular-nums;font-size:15px}
+.st-row:first-child{border-top:0}
+.st-head{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-block:9px 7px;background:var(--chip)}
+.st-row .num{text-align:right;white-space:nowrap}
+.st-row .pos{color:var(--muted);font-weight:600;font-size:13px}
+.st-team{display:flex;align-items:center;gap:8px;min-width:0}
+.st-team .logo{width:26px;height:26px;border-radius:6px;font-size:13px;flex:0 0 auto}
+.st-team .abbr{font-size:18px}
+.st-team .full{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-row .cr{font-weight:700}
+.st-row .strk.w{color:var(--fg)}
+.st-row .strk.l{color:var(--muted)}
+.st-note{margin:10px 2px 0;font-size:13px;color:var(--muted)}
+@media (max-width:600px){.st-team .full{display:none}}
 .notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px;padding:10px 14px;border-radius:10px;
   background:var(--chip);color:var(--fg);font-size:13px}
 .notice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer}
@@ -126,7 +162,7 @@ body{overflow-x:clip}
 <header>
   <div class="wrap">
     <div class="top"><h1>Hoops<span>.</span></h1>
-      <div class="tools">
+      <div class="tools" id="scores-tools">
         <button class="updated" id="updated" title="Refresh now">Loading…</button>
         <button class="today-btn" id="today-btn" hidden>Today</button>
         <label class="cal" title="Jump to a date"><span class="vh">Jump to a date</span>
@@ -135,6 +171,7 @@ body{overflow-x:clip}
         </label>
       </div>
     </div>
+    <nav class="confs" id="confs" aria-label="Choose a conference" hidden></nav>
     <nav class="dates" id="dates" aria-label="Choose a date"></nav>
     <div class="filterbar" id="filterbar">
       <button class="dd-btn" id="btn-conf" data-panel="conf-row" aria-expanded="false" aria-controls="conf-row"><span class="dd-k">Conference</span><span class="dd-v" id="sum-conf">All</span></button>
@@ -147,6 +184,13 @@ body{overflow-x:clip}
   </div>
 </header>
 <main class="wrap" id="board"></main>
+<main class="wrap" id="standings" hidden></main>
+<nav class="tabbar" aria-label="Sections">
+  <button class="tab" id="tab-scores" data-view="scores" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/></svg>Scores</button>
+  <button class="tab" id="tab-standings" data-view="standings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 4v16"/></svg>Standings</button>
+</nav>
 
 <script>
 /* =========================================================================
@@ -165,13 +209,13 @@ const IDLE_REFRESH_MS = 5 * 60_000; // otherwise
 // ESPN conference ids -> the names this app uses
 const CONF_BY_ID = {
   1:"America East",2:"ACC",3:"A-10",4:"Big East",5:"Big Sky",6:"Big South",7:"Big Ten",8:"Big 12",9:"Big West",10:"CAA",
-  11:"Conference USA",12:"Ivy League",13:"MAAC",14:"MAC",16:"MEAC",18:"Missouri Valley",19:"NEC",20:"OVC",21:"Pac-12",22:"Patriot",
+  11:"Conference USA",12:"Ivy League",13:"Metro",14:"MAC",16:"MEAC",18:"Missouri Valley",19:"NEC",20:"OVC",21:"Pac-12",22:"Patriot",
   23:"SEC",24:"SoCon",25:"Southland",26:"SWAC",27:"Sun Belt",29:"WCC",30:"UAC",44:"MWC",45:"Horizon",46:"ASUN",49:"Summit",62:"American"
 };
 const P5 = ["ACC","Big Ten","Big 12","SEC","Big East"];
 const NEXT5 = ["Pac-12","WCC","A-10","American","MWC"];
 const P5PLUS = [...P5, ...NEXT5];
-const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conference USA","Horizon","Ivy League","MAAC","MAC","MEAC",
+const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conference USA","Horizon","Ivy League","MAC","MEAC","Metro",
   "Missouri Valley","NEC","OVC","Patriot","SoCon","Southland","Summit","Sun Belt","SWAC","UAC"];
 
 /* =========================================================================
@@ -526,9 +570,10 @@ document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
     if(x0===null) return;
     const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0; x0=null;
     if(Math.abs(dx)<60 || Math.abs(dx)<Math.abs(dy)*1.5 || Date.now()-t0>700) return; // not a sideways swipe
+    closeAll();
+    if(view==="standings"){ stepConf(dx<0 ? 1 : -1); return; }
     const next = dayOff + (dx<0 ? 1 : -1);
     if(next<FIRST_OFF || next>LAST_OFF) return;
-    closeAll();
     goTo(next);
   }, {passive:true});
 })();
@@ -539,6 +584,119 @@ document.getElementById("updated").addEventListener("click", ()=>{ if(mode==="li
 document.getElementById("board").addEventListener("click", e=>{
   if(e.target.closest("#retry")){ mode="live"; lastUpdated=null; games=[]; load(); }
 });
+
+/* =========================================================================
+   STANDINGS
+   ========================================================================= */
+const STANDINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/v2/sports/basketball/mens-college-basketball/standings";
+const RANKINGS_FEED = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball/rankings";
+const CONF_ORDER = [...abc(P5), null, ...abc(NEXT5), null, ...abc(REST)];   // same order as the filter
+const CONF_LIST = CONF_ORDER.filter(Boolean);
+let view = "scores";                 // "scores" or "standings"
+let stConf = CONF_LIST[0];           // conference shown on the standings page
+let stData = null, stUpdated = null, stLoading = false, stFailed = false, apRanks = {};
+
+const statOf = (e, type) => { const s=(e.stats||[]).find(x=>x.type===type); return s ? s.displayValue : ""; };
+function parseStandings(j){
+  const out = {};
+  for(const c of j.children||[]){
+    const name = CONF_BY_ID[c.id]; if(!name) continue;
+    const rows = (c.standings && c.standings.entries || []).map((e,i)=>{
+      const t=e.team||{};
+      return {id:t.id, abbr:t.abbreviation||"", school:t.location||t.displayName||"", conf:name,
+        logo:(t.logos&&t.logos[0]&&t.logos[0].href)||"", c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
+        ovr:statOf(e,"total")||"0-0", cr:statOf(e,"vsconf")||"0-0", gb:statOf(e,"vsconf_gamesbehind"), strk:statOf(e,"streak"),
+        seed:+statOf(e,"playoffseed")||0, i};
+    });
+    rows.sort((a,b)=> (a.seed&&b.seed) ? a.seed-b.seed : a.i-b.i);
+    out[name] = rows;
+  }
+  return out;
+}
+function sampleStandings(){ // preview only: built from the sample teams
+  const out = {};
+  for(const [abbr,[school,conf,c1,c2]] of Object.entries(S_TEAMS)){
+    const [ovr,cr] = S_REC[abbr].match(/\d+-\d+/g);
+    (out[conf] = out[conf]||[]).push({id:abbr, abbr, school, conf, logo:"", c1, c2, ovr, cr, gb:"", strk:"", seed:0, rank:S_RANK[abbr]});
+  }
+  for(const rows of Object.values(out)){
+    const pct = r => { const [w,l]=r.cr.split("-").map(Number); return w/((w+l)||1); };
+    rows.sort((a,b)=>pct(b)-pct(a));
+    const [lw,ll] = rows[0].cr.split("-").map(Number);
+    rows.forEach(r=>{ const [w,l]=r.cr.split("-").map(Number); const g=((lw-w)+(l-ll))/2; r.gb = g ? String(g) : "-"; });
+  }
+  return out;
+}
+async function loadStandings(){
+  if(stLoading) return; stLoading = true; renderStandings();
+  try{
+    const season = SEASON_YEAR + 1; // ESPN names a season by the year it ends (2026-27 = 2027)
+    const [sj, rj] = await Promise.all([
+      fetch(`${STANDINGS_FEED}?group=50&season=${season}`, {cache:"no-store"}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch(RANKINGS_FEED, {cache:"no-store"}).then(r=>r.ok?r.json():{}).catch(()=>({}))
+    ]);
+    stData = parseStandings(sj);
+    apRanks = {};
+    const ap = (rj.rankings||[]).find(r=>/^AP/i.test(r.name||"")) || (rj.rankings||[])[0];
+    for(const r of (ap && ap.ranks)||[]) if(r.team && r.current<=25) apRanks[r.team.id] = r.current;
+    stUpdated = new Date(); stFailed = false;
+  }catch(e){
+    if(!stData){ stData = sampleStandings(); stFailed = true; }
+  }
+  stLoading = false; renderStandings();
+}
+function renderConfStrip(){
+  document.getElementById("confs").innerHTML = CONF_ORDER.map(c => c
+    ? `<button class="conf-chip" id="cs-${c.replace(/\W/g,"")}" data-conf="${esc(c)}" aria-pressed="${c===stConf}">${esc(c)}</button>`
+    : `<span class="sep" aria-hidden="true"></span>`).join("");
+}
+function centerConf(smooth){
+  const strip=document.getElementById("confs"), b=strip.querySelector('[aria-pressed="true"]'); if(!b) return;
+  strip.scrollTo({left:b.offsetLeft-strip.clientWidth/2+b.offsetWidth/2, behavior:smooth&&!matchMedia("(prefers-reduced-motion: reduce)").matches?"smooth":"auto"});
+}
+function renderStandings(){
+  document.querySelectorAll(".conf-chip").forEach(b=>b.setAttribute("aria-pressed", b.dataset.conf===stConf));
+  const el = document.getElementById("standings");
+  const notice = stFailed ? `<div class="notice"><span>Can't reach live standings here, so these are sample teams.</span></div>` : "";
+  if(!stData){ el.innerHTML = `<div class="skeleton" style="height:420px"></div>`; return; }
+  const rows = stData[stConf] || [];
+  const started = rows.some(r=>r.ovr!=="0-0");
+  const updated = stUpdated ? "Updated " + stUpdated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
+  const body = rows.map((r,i)=>{
+    const rank = r.rank || apRanks[r.id];
+    const logo = r.logo
+      ? `<div class="logo has-img" style="--tc1:${esc(r.c1)};--tc2:${esc(r.c2)}" aria-hidden="true">${esc(r.abbr[0]||"")}<img src="${esc(r.logo)}" alt="" loading="lazy" onerror="this.parentNode.classList.remove('has-img');this.remove()"></div>`
+      : `<div class="logo" style="--tc1:${esc(r.c1)};--tc2:${esc(r.c2)}" aria-hidden="true">${esc(r.abbr[0]||"")}</div>`;
+    const sk = /^W/.test(r.strk) ? "w" : /^L/.test(r.strk) ? "l" : "";
+    return `<div class="st-row"><span class="num pos">${started ? i+1 : ""}</span>
+      <div class="st-team">${logo}${rank?`<span class="rank">${rank}</span>`:""}<span class="abbr">${esc(r.abbr)}</span><span class="full">${esc(r.school)}</span></div>
+      <span class="num cr">${esc(r.cr)}</span><span class="num">${esc(r.ovr)}</span><span class="num">${started ? esc(r.gb||"-") : "-"}</span><span class="num strk ${sk}">${esc(r.strk && r.strk!=="-" ? r.strk : "-")}</span></div>`;
+  }).join("");
+  el.innerHTML = notice + `<div class="st-title"><h2>${esc(stConf)}</h2><span>${updated}</span></div>` +
+    (rows.length
+      ? `<div class="table" role="table" aria-label="${esc(stConf)} standings"><div class="st-row st-head"><span class="num">#</span><span>Team</span><span class="num">Conf</span><span class="num">Ovr</span><span class="num">GB</span><span class="num">Strk</span></div>${body}</div>`
+      : `<p class="empty">No standings for the ${esc(stConf)} yet.</p>`) +
+    (rows.length && !started ? `<p class="st-note">The season hasn't started, so teams are listed alphabetically. Standings fill in once games are played.</p>` : "");
+}
+function setConf(c){ if(!c || c===stConf) return; stConf = c; window.scrollTo(0,0); renderStandings(); centerConf(true); }
+function stepConf(d){ const i = CONF_LIST.indexOf(stConf), n = i + d; if(n>=0 && n<CONF_LIST.length) setConf(CONF_LIST[n]); }
+document.getElementById("confs").addEventListener("click", e=>{ const b=e.target.closest(".conf-chip"); if(b) setConf(b.dataset.conf); });
+
+function setView(v){
+  if(v===view) return; view = v; closeAll();
+  const st = v==="standings";
+  for(const id of ["scores-tools","dates","filterbar","board"]) document.getElementById(id).hidden = st;
+  for(const id of ["confs","standings"]) document.getElementById(id).hidden = !st;
+  document.getElementById("tab-scores").toggleAttribute("aria-current", !st);
+  document.getElementById("tab-standings").toggleAttribute("aria-current", st);
+  if(!st) document.getElementById("tab-scores").setAttribute("aria-current","page");
+  else document.getElementById("tab-standings").setAttribute("aria-current","page");
+  window.scrollTo(0,0);
+  if(st){ renderConfStrip(); centerConf(false); if(!stData || Date.now()-stUpdated > 5*60_000) loadStandings(); else renderStandings(); }
+  else centerDate(false);
+}
+document.querySelector(".tabbar").addEventListener("click", e=>{ const b=e.target.closest(".tab"); if(b) setView(b.dataset.view); });
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && view==="standings") loadStandings(); });
 
 renderDates();
 { const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
