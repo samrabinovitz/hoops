@@ -353,6 +353,8 @@ const isAlt = n => { const t=netType(n); return t==="conf"||t==="stream"; };
 /* =========================================================================
    READING ESPN'S FEED -> one tidy object per game
    ========================================================================= */
+// ESPN serves every team's logo at a fixed address based on its team id, so use that when a feed leaves the logo out
+const espnLogo = id => id ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png` : "";
 function parseTeam(c, state){
   const t = c.team || {};
   const recs = c.records || [];
@@ -370,7 +372,7 @@ function parseTeam(c, state){
     crec: vsconf ? vsconf.summary : "",
     score: state==="u" || raw==null || raw==="" ? null : Number(raw),
     winner: c.winner === true,
-    logo: t.logo || (t.logos && t.logos[0] && t.logos[0].href) || "",
+    logo: t.logo || (t.logos && t.logos[0] && t.logos[0].href) || espnLogo(t.id),
     c1: t.color ? "#"+t.color : "#5b6470",
     c2: t.alternateColor ? "#"+t.alternateColor : "#ffffff",
     inBracket: [school, t.shortDisplayName, t.displayName && t.name ? t.displayName.replace(" "+t.name,"") : ""].some(n=>n&&BRACKET_SET.has(normName(n)))
@@ -688,7 +690,7 @@ function parseStandings(j){
     const rows = (c.standings && c.standings.entries || []).map((e,i)=>{
       const t=e.team||{};
       return {id:t.id, abbr:t.abbreviation||"", school:t.location||t.displayName||"", conf:name,
-        logo:(t.logos&&t.logos[0]&&t.logos[0].href)||"", c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
+        logo:(t.logos&&t.logos[0]&&t.logos[0].href)||espnLogo(t.id), c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
         ovr:statOf(e,"total")||"0-0", cr:statOf(e,"vsconf")||"0-0", gb:statOf(e,"vsconf_gamesbehind"), strk:statOf(e,"streak"),
         seed:+statOf(e,"playoffseed")||0, i};
     });
@@ -737,7 +739,7 @@ function parsePoll(ap){
   const rows = (ap.ranks||[]).filter(r=>r.team).map(r=>{
     const t=r.team, prev=+r.previous||0, cur=+r.current;
     return {rank:cur, id:t.id, abbr:t.abbreviation||"", school:t.location||"", conf:confOf[t.id]||"",
-      logo:t.logo||(t.logos&&t.logos[0]&&t.logos[0].href)||"", c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
+      logo:t.logo||(t.logos&&t.logos[0]&&t.logos[0].href)||espnLogo(t.id), c1:t.color?"#"+t.color:"#5b6470", c2:t.alternateColor?"#"+t.alternateColor:"#ffffff",
       rec:r.recordSummary||"", fpv:+r.firstPlaceVotes||0, pts:+r.points||0,
       chg: pre ? null : prev===0 ? "new" : prev-cur};
   });
@@ -781,7 +783,7 @@ async function loadBPI(){
       const v = ((t.categories||[]).find(c=>c.name==="bpi")||{}).values || [];
       const tm = t.team||{}, get = n => ix(n)>=0 ? v[ix(n)] : null;
       return {id:tm.id, abbr:tm.abbreviation||"", school:tm.shortDisplayName||tm.location||"", conf:confOf[tm.id]||"",
-        logo:(tm.logos&&tm.logos[0]&&tm.logos[0].href)||"", c1:tm.color?"#"+tm.color:"#5b6470", c2:"#ffffff",
+        logo:(tm.logos&&tm.logos[0]&&tm.logos[0].href)||espnLogo(tm.id), c1:tm.color?"#"+tm.color:"#5b6470", c2:"#ffffff",
         rank:+get("bpirank")||0, bpi:get("bpi"), chg:+get("bpisevendaychangerank")||0,
         rec:`${get("wins")??0}-${get("losses")??0}`};
     }).filter(r=>r.rank).sort((a,b)=>a.rank-b.rank);
