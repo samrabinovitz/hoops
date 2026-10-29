@@ -98,6 +98,13 @@ main{padding-block:16px calc(40px + env(safe-area-inset-bottom,0px))}
 .notice{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px;padding:10px 14px;border-radius:10px;
   background:var(--chip);color:var(--fg);font-size:13px}
 .notice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer}
+
+#board{min-height:70vh}
+.slide-l{animation:slideL .22s ease-out}
+.slide-r{animation:slideR .22s ease-out}
+@keyframes slideL{from{opacity:.3;transform:translateX(40px)}to{opacity:1;transform:none}}
+@keyframes slideR{from{opacity:.3;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.slide-l,.slide-r{animation:none}}
 .count{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--muted)}
 .count b{font-family:var(--display);font-size:20px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums}
 .section-label{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
@@ -524,6 +531,28 @@ document.getElementById("dates").addEventListener("click", e=>{
   goTo(+b.dataset.off);
 });
 document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
+
+// Swipe the games left for the next day, right for the previous day
+(() => {
+  const board = document.getElementById("board");
+  let x0=null, y0=0, t0=0;
+  document.addEventListener("touchstart", e=>{
+    if(e.touches.length!==1 || e.target.closest("header,.dd-panel")){ x0=null; return; }
+    x0=e.touches[0].clientX; y0=e.touches[0].clientY; t0=Date.now();
+  }, {passive:true});
+  document.addEventListener("touchend", e=>{
+    if(x0===null) return;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0; x0=null;
+    if(Math.abs(dx)<60 || Math.abs(dx)<Math.abs(dy)*1.5 || Date.now()-t0>700) return; // not a sideways swipe
+    const next = dayOff + (dx<0 ? 1 : -1);
+    if(next<FIRST_OFF || next>LAST_OFF) return;
+    closeAll();
+    board.classList.remove("slide-l","slide-r"); void board.offsetWidth;
+    board.classList.add(dx<0 ? "slide-l" : "slide-r");
+    goTo(next);
+  }, {passive:true});
+  board.addEventListener("animationend", ()=>board.classList.remove("slide-l","slide-r"));
+})();
 document.getElementById("jump").addEventListener("change", e=>{
   const v=e.target.value; if(!v) return; const [y,m,d]=v.split("-").map(Number); goTo(offFor(new Date(y,m-1,d)));
 });
