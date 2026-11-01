@@ -1242,8 +1242,8 @@ function renderTeam(){
       ${hasStats ? `<p class="st-note">Per-game averages from this season's box scores. Sorted by points.</p>` : ""}`;
 
   el.innerHTML = back + head +
-    `<h3 class="tm-h">Schedule & results${played.length?` <small>${wins}-${played.length-wins}</small>`:""}</h3>${sched}
-     <h3 class="tm-h">Rankings</h3>${ranks}
+    `<h3 class="tm-h">Rankings</h3>${ranks}
+     <h3 class="tm-h">Schedule & results${played.length?` <small>${wins}-${played.length-wins}</small>`:""}</h3>${sched}
      <h3 class="tm-h">Team stats</h3>${statsBody}
      <h3 class="tm-h">Roster</h3>${rosterBody}`;
 }
