@@ -1094,6 +1094,8 @@ document.getElementById("confs").addEventListener("click", e=>{ const b=e.target
    ========================================================================= */
 const TEAM_API = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball";
 let openTeamId = null, teamScrollBack = 0;
+const teamStack = [];   // team pages behind the current one (team → opponent → …), so Back steps back one at a time
+let ignorePop = 0;     // pops we caused ourselves with history.back()
 const tmCollapsed = new Set();   // team-page sections the viewer has hidden
 const teamCache = {};          // id -> {info, games, roster, loaded flags}
 const boxCache = {};           // event id -> parsed box score (finished games never change)
@@ -1195,7 +1197,8 @@ function teamStats(id){
 }
 function openTeam(id){
   if(!id) return;
-  teamScrollBack = window.scrollY;
+  if(openTeamId){ if(String(id)===openTeamId) return; teamStack.push({id:openTeamId, scroll:window.scrollY}); }
+  else { teamScrollBack = window.scrollY; teamStack.length = 0; }
   openTeamId = String(id);
   document.getElementById("confs").hidden = true;
   document.getElementById("standings").hidden = true;
@@ -1206,15 +1209,27 @@ function openTeam(id){
   if(!bpiData && !bpiLoading) loadBPI().then(()=>{ if(openTeamId) renderTeam(); });
   loadTeam(openTeamId);
 }
+// Back from a team page: to the previous team if there is one, otherwise to the list
 function closeTeam(skipHistory){
   if(!openTeamId) return;
+  if(!skipHistory) goBackInHistory("team");
+  if(teamStack.length){
+    const prev = teamStack.pop();
+    openTeamId = prev.id;
+    renderTeam(); loadTeam(openTeamId);
+    window.scrollTo(0, prev.scroll);
+    return;
+  }
   openTeamId = null;
   document.getElementById("team").hidden = true;
   if(view==="standings"){ document.getElementById("confs").hidden = false; document.getElementById("standings").hidden = false; }
   window.scrollTo(0, teamScrollBack);
-  if(!skipHistory){ try{ if(history.state && history.state.team) history.back(); }catch(e){} }
 }
-addEventListener("popstate", ()=>{ if(openGameId) closeGame(true); else if(openTeamId) closeTeam(true); });
+// Leave all team pages at once (switching tabs)
+function closeAllTeams(){ if(!openTeamId) return; const n = teamStack.length + 1; teamStack.length = 0; closeTeam(true);
+  try{ for(let i=0;i<n;i++){ if(history.state && history.state.team){ ignorePop++; history.back(); } } }catch(e){} }
+function goBackInHistory(kind){ try{ if(history.state && history.state[kind]){ ignorePop++; history.back(); } }catch(e){} }
+addEventListener("popstate", ()=>{ if(ignorePop){ ignorePop--; return; } if(openGameId) closeGame(true); else if(openTeamId) closeTeam(true); });
 document.getElementById("standings").addEventListener("click", e=>{
   if(e.target.closest(".bk-search,.bk-r")) return;
   const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid);
@@ -1225,7 +1240,7 @@ document.getElementById("standings").addEventListener("keydown", e=>{
 document.getElementById("team").addEventListener("click", e=>{
   if(e.target.closest(".tm-back")) closeTeam();
   const tg = e.target.closest(".tm-toggle"); if(tg){ toggleSection(tg); return; }
-  const o = e.target.closest(".tap[data-tid]"); if(o) { closeTeam(true); openTeam(o.dataset.tid); return; }
+  const o = e.target.closest(".tap[data-tid]"); if(o) { openTeam(o.dataset.tid); return; }
   const gr = e.target.closest(".tm-game[data-eid]"); if(gr) openGame(gr.dataset.eid);
 });
 
@@ -1415,7 +1430,7 @@ function closeGame(skipHistory){
   for(const p of gameHidden) document.getElementById(p).hidden = false;
   gameHidden = [];
   window.scrollTo(0, gameScrollBack);
-  if(!skipHistory){ try{ if(history.state && history.state.game) history.back(); }catch(e){} }
+  if(!skipHistory) goBackInHistory("game");
 }
 document.getElementById("game").addEventListener("click", e=>{
   if(e.target.closest(".tm-back")){ closeGame(); return; }
@@ -1424,7 +1439,7 @@ document.getElementById("game").addEventListener("click", e=>{
   const sw = e.target.closest(".gm-side"); if(sw){ gameSide = sw.dataset.side; renderGame(); return; }
   if(e.target.closest(".gm-more")){ gameAllPlays = !gameAllPlays; renderGame(); return; }
   const tm = e.target.closest(".gm-team[data-tid]");
-  if(tm){ const tid = tm.dataset.tid; closeGame(true); if(view!=="standings") setView("standings"); if(openTeamId) closeTeam(true); openTeam(tid); }
+  if(tm){ const tid = tm.dataset.tid; closeGame(); if(view!=="standings") setView("standings"); openTeam(tid); }
 });
 
 function renderGame(){
@@ -1512,8 +1527,8 @@ function setView(v){
   else centerDate(false);
 }
 document.querySelector(".tabbar").addEventListener("click", e=>{ const b=e.target.closest(".tab"); if(!b) return;
-  if(openGameId) closeGame(true);
-  if(openTeamId && (b.dataset.view!=="standings" || view==="standings")) closeTeam(true);
+  if(openGameId) closeGame();
+  if(openTeamId && (b.dataset.view!=="standings" || view==="standings")) closeAllTeams();
   setView(b.dataset.view); });
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && view==="standings") loadStandings(); });
 
