@@ -134,6 +134,13 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .tm-id p{margin:4px 0 0;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 .tm-h{display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-weight:800;font-size:20px;text-transform:uppercase;letter-spacing:.02em;margin:22px 0 8px}
 .tm-h small{font-family:var(--body);font-size:13px;font-weight:700;color:var(--muted);letter-spacing:0}
+.tm-toggle{display:flex;align-items:baseline;gap:8px;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;padding:4px 0;cursor:pointer;text-align:left}
+.tm-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.tm-toggle .chev{margin-left:auto;align-self:center;width:22px;height:22px;flex:0 0 auto;color:var(--muted);transition:transform .2s}
+.tm-sec.shut .chev{transform:rotate(180deg)}
+.tm-sec.shut .tm-h{margin-bottom:0}
+.tm-sec.shut{border-bottom:1px solid var(--line);padding-bottom:6px}
+@media (prefers-reduced-motion:reduce){.tm-toggle .chev{transition:none}}
 .tm-game{display:grid;grid-template-columns:78px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
 .tm-game:first-child{border-top:0}
 .tm-game.next{background:var(--chip)}
@@ -1011,6 +1018,7 @@ document.getElementById("confs").addEventListener("click", e=>{ const b=e.target
    ========================================================================= */
 const TEAM_API = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball";
 let openTeamId = null, teamScrollBack = 0;
+const tmCollapsed = new Set();   // team-page sections the viewer has hidden
 const teamCache = {};          // id -> {info, games, roster, loaded flags}
 const boxCache = {};           // event id -> parsed box score (finished games never change)
 
@@ -1140,6 +1148,10 @@ document.getElementById("standings").addEventListener("keydown", e=>{
 });
 document.getElementById("team").addEventListener("click", e=>{
   if(e.target.closest(".tm-back")) closeTeam();
+  const tg = e.target.closest(".tm-toggle");
+  if(tg){ const k = tg.dataset.sec, sec = tg.closest(".tm-sec"), shut = !tmCollapsed.has(k);
+    if(shut) tmCollapsed.add(k); else tmCollapsed.delete(k);
+    sec.classList.toggle("shut", shut); tg.setAttribute("aria-expanded", !shut); sec.querySelector(".tm-body").hidden = shut; return; }
   const o = e.target.closest(".tap[data-tid]"); if(o) { closeTeam(true); openTeam(o.dataset.tid); }
 });
 
@@ -1225,11 +1237,18 @@ function renderTeam(){
         <span class="num">${r.s?r.s.gp:"–"}</span><span class="num cr">${r.s?per(r.s.pts,r.s.gp):"–"}</span><span class="num">${r.s?per(r.s.reb,r.s.gp):"–"}</span><span class="num">${r.s?per(r.s.ast,r.s.gp):"–"}</span></div>`).join("")}</div>
       ${hasStats ? `<p class="st-note">Per-game averages from this season's box scores. Sorted by points.</p>` : ""}`;
 
+  // Each section can be hidden with its arrow; what's hidden stays hidden for other teams until the app is closed
+  const section = (key, title, sub, body) => { const shut = tmCollapsed.has(key);
+    return `<section class="tm-sec${shut?" shut":""}">
+      <h3 class="tm-h"><button type="button" class="tm-toggle" data-sec="${key}" aria-expanded="${!shut}" aria-controls="tm-${key}">
+        <span>${title}</span>${sub?`<small>${sub}</small>`:""}
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button></h3>
+      <div class="tm-body" id="tm-${key}"${shut?" hidden":""}>${body}</div></section>`; };
   el.innerHTML = back + head +
-    `<h3 class="tm-h">Rankings</h3>${ranks}
-     <h3 class="tm-h">Schedule & results${played.length?` <small>${wins}-${played.length-wins}</small>`:""}</h3>${sched}
-     <h3 class="tm-h">Team stats</h3>${statsBody}
-     <h3 class="tm-h">Roster</h3>${rosterBody}`;
+    section("rank", "Rankings", "", ranks) +
+    section("sched", "Schedule & results", played.length ? `${wins}-${played.length-wins}` : "", sched) +
+    section("stats", "Team stats", "", statsBody) +
+    section("roster", "Roster", "", rosterBody);
 }
 
 function setView(v){
