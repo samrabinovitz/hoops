@@ -689,7 +689,7 @@ function render(){
   for(const [k,label] of [["l","Live"],["f","Final"],["u","Upcoming"]]){
     if(statuses.size && !statuses.has(k)) continue;
     const list = shown.filter(g=>g.state===k); if(!list.length) continue;
-    if(k==="u") list.sort((a,b)=>a.time-b.time);
+    list.sort((a,b)=>a.time-b.time || String(a.id).localeCompare(String(b.id))); // every section in tip-off order
     html += `<h2 class="section-label">${label} · ${list.length}</h2><div class="grid">${list.map(box).join("")}</div>`;
   }
   const day = dateFor(dayOff).toLocaleDateString([], {month:"short", day:"numeric"});
