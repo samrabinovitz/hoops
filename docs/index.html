@@ -797,8 +797,7 @@ document.getElementById("today-btn").addEventListener("click", ()=>goTo(0));
     const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0; x0=null;
     if(Math.abs(dx)<60 || Math.abs(dx)<Math.abs(dy)*1.5 || Date.now()-t0>700) return; // not a sideways swipe
     closeAll();
-    if(openGameId){ if(dx>0) closeGame(); return; }
-    if(view==="standings" && openTeamId){ if(dx>0) closeTeam(); return; }
+    if(navStack.length){ if(dx>0) navBack(); return; }
     if(view==="standings"){ stepConf(dx<0 ? 1 : -1); return; }
     const next = dayOff + (dx<0 ? 1 : -1);
     if(next<FIRST_OFF || next>LAST_OFF) return;
@@ -879,6 +878,7 @@ async function loadStandings(){
     if(!stData){ stData = sampleStandings(); stFailed = true; }
   }
   stLoading = false; renderStandings();
+  if(openTeamId) renderTeam();
 }
 function parsePoll(ap){
   const confOf = {}; for(const rows of Object.values(stData||{})) for(const r of rows) confOf[r.id] = r.conf;
@@ -1109,9 +1109,7 @@ document.getElementById("confs").addEventListener("click", e=>{ const b=e.target
    TEAM PAGE (opened from Standings, Top 25, BPI and the Bracketology bracket)
    ========================================================================= */
 const TEAM_API = (RELAY || "https://site.api.espn.com") + "/apis/site/v2/sports/basketball/mens-college-basketball";
-let openTeamId = null, teamScrollBack = 0;
-const teamStack = [];   // team pages behind the current one (team → opponent → …), so Back steps back one at a time
-let ignorePop = 0;     // pops we caused ourselves with history.back()
+let openTeamId = null;
 const tmCollapsed = new Set();   // team-page sections the viewer has hidden
 const teamCache = {};          // id -> {info, games, roster, loaded flags}
 const boxCache = {};           // event id -> parsed box score (finished games never change)
@@ -1211,41 +1209,80 @@ function teamStats(id){
   }
   return {tot, pl};
 }
-function openTeam(id){
-  if(!id) return;
-  if(openTeamId){ if(String(id)===openTeamId) return; teamStack.push({id:openTeamId, scroll:window.scrollY}); }
-  else { teamScrollBack = window.scrollY; teamStack.length = 0; }
-  openTeamId = String(id);
-  document.getElementById("confs").hidden = true;
-  document.getElementById("standings").hidden = true;
-  document.getElementById("team").hidden = false;
-  window.scrollTo(0,0);
-  try{ history.pushState({team:openTeamId}, ""); }catch(e){}
-  renderTeam();
-  if(!bpiData && !bpiLoading) loadBPI().then(()=>{ if(openTeamId) renderTeam(); });
-  loadTeam(openTeamId);
+/* =========================================================================
+   PAGE HISTORY: every team or game page you open is stacked on top of the tab you're on
+   (Scores or Standings). Back always removes exactly the top page. The phone's back
+   history mirrors the stack: each page pushes one entry tagged with its depth, and every
+   Back (button, swipe, phone gesture) goes through history.back(), so the two can't drift.
+   ========================================================================= */
+const navStack = [];      // [{type:"team"|"game", id, scroll, ...page state}]
+let baseScroll = 0;        // where the tab underneath was scrolled to
+const BASE_PARTS = {scores:["scores-tools","dates","filterbar","board"], standings:["confs","standings"]};
+const ALL_PARTS = ["scores-tools","dates","filterbar","board","confs","standings","team","game"];
+const navTop = () => navStack[navStack.length-1] || null;
+
+function navPush(entry){
+  closeAll();
+  if(navStack.length) navTop().scroll = window.scrollY; else baseScroll = window.scrollY;
+  navStack.push(entry);
+  try{ history.pushState({depth:navStack.length}, ""); }catch(e){}
+  showTop(true);
 }
-// Back from a team page: to the previous team if there is one, otherwise to the list
-function closeTeam(skipHistory){
-  if(!openTeamId) return;
-  if(!skipHistory) goBackInHistory("team");
-  if(teamStack.length){
-    const prev = teamStack.pop();
-    openTeamId = prev.id;
-    renderTeam(); loadTeam(openTeamId);
-    window.scrollTo(0, prev.scroll);
+function navBack(){
+  if(!navStack.length) return;
+  let viaHistory = false;
+  try{ if(history.state && history.state.depth===navStack.length){ history.back(); viaHistory = true; } }catch(e){}
+  if(!viaHistory){ navStack.pop(); showTop(false); }   // no matching history entry: step back directly
+}
+function navReset(){
+  const n = navStack.length; if(!n) return;
+  navStack.length = 0;
+  try{ if(history.state && history.state.depth===n) history.go(-n); }catch(e){}
+}
+addEventListener("popstate", e=>{
+  const depth = (e.state && e.state.depth) || 0;
+  if(depth < navStack.length){ navStack.length = depth; showTop(false); }
+});
+// Show whatever is on top: a team page, a game page, or the tab underneath
+function showTop(fresh){
+  const top = navTop();
+  clearTimeout(gameTimer);
+  for(const id of ALL_PARTS) document.getElementById(id).hidden = true;
+  openTeamId = null; openGameId = null;
+  if(!top){
+    for(const id of BASE_PARTS[view]) document.getElementById(id).hidden = false;
+    gameData = null;
+    if(view==="scores") centerDate(false); else centerConf(false);
+    window.scrollTo(0, baseScroll);
     return;
   }
-  openTeamId = null;
-  document.getElementById("team").hidden = true;
-  if(view==="standings"){ document.getElementById("confs").hidden = false; document.getElementById("standings").hidden = false; }
-  window.scrollTo(0, teamScrollBack);
+  if(top.type==="team"){
+    openTeamId = top.id;
+    document.getElementById("team").hidden = false;
+    renderTeam();
+    window.scrollTo(0, fresh ? 0 : (top.scroll||0));
+    if(!stData && !stLoading) loadStandings();
+    if(!bpiData && !bpiLoading) loadBPI().then(()=>{ if(openTeamId) renderTeam(); });
+    loadTeam(top.id);
+  } else {
+    openGameId = top.id;
+    gameTab = top.tab; gameSide = top.side; gameAllPlays = top.all; gameData = top.data || null;
+    document.getElementById("game").hidden = false;
+    renderGame();
+    window.scrollTo(0, fresh ? 0 : (top.scroll||0));
+    loadGame(top.id);
+  }
 }
-// Leave all team pages at once (switching tabs)
-function closeAllTeams(){ if(!openTeamId) return; const n = teamStack.length + 1; teamStack.length = 0; closeTeam(true);
-  try{ for(let i=0;i<n;i++){ if(history.state && history.state.team){ ignorePop++; history.back(); } } }catch(e){} }
-function goBackInHistory(kind){ try{ if(history.state && history.state[kind]){ ignorePop++; history.back(); } }catch(e){} }
-addEventListener("popstate", ()=>{ if(ignorePop){ ignorePop--; return; } if(openGameId) closeGame(true); else if(openTeamId) closeTeam(true); });
+function openTeam(id){
+  if(!id) return; id = String(id);
+  const top = navTop(); if(top && top.type==="team" && top.id===id) return;
+  navPush({type:"team", id});
+}
+function openGame(id){
+  if(!id) return; id = String(id);
+  const top = navTop(); if(top && top.type==="game" && top.id===id) return;
+  navPush({type:"game", id, tab:"box", side:"away", all:false, data:null});
+}
 document.getElementById("standings").addEventListener("click", e=>{
   if(e.target.closest(".bk-search,.bk-r")) return;
   const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid);
@@ -1254,7 +1291,7 @@ document.getElementById("standings").addEventListener("keydown", e=>{
   if(e.key!=="Enter") return; const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid);
 });
 document.getElementById("team").addEventListener("click", e=>{
-  if(e.target.closest(".tm-back")) closeTeam();
+  if(e.target.closest(".tm-back")){ navBack(); return; }
   const tg = e.target.closest(".tm-toggle"); if(tg){ toggleSection(tg); return; }
   const o = e.target.closest(".tap[data-tid]"); if(o) { openTeam(o.dataset.tid); return; }
   const gr = e.target.closest(".tm-game[data-eid]"); if(gr) openGame(gr.dataset.eid);
@@ -1366,9 +1403,8 @@ function renderTeam(){
 /* =========================================================================
    GAME PAGE (live and finished games, from Scores and from a team's schedule)
    ========================================================================= */
-let openGameId = null, gameData = null, gameTimer = null, gameTab = "box", gameSide = "away", gameAllPlays = false, gameHidden = [], gameScrollBack = 0;
+let openGameId = null, gameData = null, gameTimer = null, gameTab = "box", gameSide = "away", gameAllPlays = false;
 const GAME_REFRESH_MS = 20_000;
-const PAGE_PARTS = ["scores-tools","dates","filterbar","board","confs","standings","team"];
 
 function parseGame(j){
   const comp = (j.header && j.header.competitions && j.header.competitions[0]) || {};
@@ -1419,6 +1455,7 @@ async function loadGame(id){
     const j = await getJSON(`${TEAM_API}/summary?event=${id}`);
     if(openGameId!==id) return;
     gameData = parseGame(j); gameData.failed = false; gameData.updated = new Date();
+    const top = navTop(); if(top && top.type==="game" && top.id===id) top.data = gameData;
     if(gameData.state==="f") boxCache[id] = j;
   }catch(e){ if(openGameId!==id) return; if(!gameData) gameData = {failed:true}; }
   renderGame();
@@ -1427,35 +1464,15 @@ async function loadGame(id){
 }
 document.addEventListener("visibilitychange", ()=>{ if(!openGameId) return; if(document.hidden) clearTimeout(gameTimer); else loadGame(openGameId); });
 
-function openGame(id){
-  if(!id) return;
-  closeAll();
-  gameScrollBack = window.scrollY;
-  gameHidden = PAGE_PARTS.filter(p=>!document.getElementById(p).hidden);
-  for(const p of gameHidden) document.getElementById(p).hidden = true;
-  openGameId = String(id); gameData = null; gameTab = "box"; gameSide = "away"; gameAllPlays = false;
-  document.getElementById("game").hidden = false;
-  window.scrollTo(0,0);
-  try{ history.pushState({game:openGameId}, ""); }catch(e){}
-  renderGame(); loadGame(openGameId);
-}
-function closeGame(skipHistory){
-  if(!openGameId) return;
-  openGameId = null; gameData = null; clearTimeout(gameTimer);
-  document.getElementById("game").hidden = true;
-  for(const p of gameHidden) document.getElementById(p).hidden = false;
-  gameHidden = [];
-  window.scrollTo(0, gameScrollBack);
-  if(!skipHistory) goBackInHistory("game");
-}
 document.getElementById("game").addEventListener("click", e=>{
-  if(e.target.closest(".tm-back")){ closeGame(); return; }
+  if(e.target.closest(".tm-back")){ navBack(); return; }
   const tg = e.target.closest(".tm-toggle"); if(tg){ toggleSection(tg); return; }
-  const tb = e.target.closest(".gm-tab"); if(tb){ gameTab = tb.dataset.tab; renderGame(); return; }
-  const sw = e.target.closest(".gm-side"); if(sw){ gameSide = sw.dataset.side; renderGame(); return; }
-  if(e.target.closest(".gm-more")){ gameAllPlays = !gameAllPlays; renderGame(); return; }
+  const top = navTop();
+  const tb = e.target.closest(".gm-tab"); if(tb){ gameTab = top.tab = tb.dataset.tab; renderGame(); return; }
+  const sw = e.target.closest(".gm-side"); if(sw){ gameSide = top.side = sw.dataset.side; renderGame(); return; }
+  if(e.target.closest(".gm-more")){ gameAllPlays = top.all = !gameAllPlays; renderGame(); return; }
   const tm = e.target.closest(".gm-team[data-tid]");
-  if(tm){ const tid = tm.dataset.tid; closeGame(); if(view!=="standings") setView("standings"); openTeam(tid); }
+  if(tm) openTeam(tm.dataset.tid);
 });
 
 function renderGame(){
@@ -1534,6 +1551,7 @@ function setView(v){
   for(const id of ["confs","standings"]) document.getElementById(id).hidden = !st;
   document.getElementById("team").hidden = true;
   document.getElementById("game").hidden = true;
+  openTeamId = null; openGameId = null; clearTimeout(gameTimer);
   document.getElementById("tab-scores").toggleAttribute("aria-current", !st);
   document.getElementById("tab-standings").toggleAttribute("aria-current", st);
   if(!st) document.getElementById("tab-scores").setAttribute("aria-current","page");
@@ -1543,9 +1561,10 @@ function setView(v){
   else centerDate(false);
 }
 document.querySelector(".tabbar").addEventListener("click", e=>{ const b=e.target.closest(".tab"); if(!b) return;
-  if(openGameId) closeGame();
-  if(openTeamId && (b.dataset.view!=="standings" || view==="standings")) closeAllTeams();
-  setView(b.dataset.view); });
+  const had = navStack.length > 0;
+  navReset();
+  if(b.dataset.view===view){ if(had){ baseScroll = 0; showTop(false); } else window.scrollTo(0,0); }
+  else setView(b.dataset.view); });
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && view==="standings") loadStandings(); });
 
 renderDates();
