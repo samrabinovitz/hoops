@@ -419,44 +419,44 @@ const REST = ["America East","ASUN","Big Sky","Big South","Big West","CAA","Conf
 
 /* =========================================================================
    BRACKETOLOGY (Joe Lunardi, ESPN) — projected 76-team field + first four out + next four out.
-   As of his update on 10/27/26. Next: Nov. 10, then weekly on Tuesdays.
+   As of his update on 11/10/26. Next: weekly on Tuesdays.
    ========================================================================= */
-const BRACKET_UPDATED = "Oct 27, 2026";
+const BRACKET_UPDATED = "Nov 10, 2026";
 // The bracket, region by region. Each region has 4 sites ("pods"); each pod has 2 games, in bracket order.
 // A game is [[seed, team], [seed, team]]; an opening-round pair is [seed, teamA, teamB].
 const BRACKET = {
   regions: [
-    {name:"South", site:"San Antonio", pods:[
-      {site:"Charlotte",  games:[[[1,"Florida"],[16,"Central Arkansas","Howard"]], [[8,"Auburn"],[9,"Indiana"]]]},
-      {site:"Sacramento", games:[[[5,"Texas Tech"],[12,"Wichita State"]], [[4,"Miami"],[13,"Santa Clara"]]]},
-      {site:"Omaha",      games:[[[6,"Vanderbilt"],[11,"Saint Louis"]], [[3,"Kansas"],[14,"UC San Diego"]]]},
-      {site:"Pittsburgh", games:[[[7,"Villanova"],[10,"Iowa","Georgia"]], [[2,"Michigan State"],[15,"Montana State","Wright State"]]]}]},
-    {name:"Midwest", site:"Kansas City", pods:[
-      {site:"Louisville",  games:[[[1,"Illinois"],[16,"Queens","Tennessee State"]], [[8,"Missouri"],[9,"North Carolina"]]]},
-      {site:"Minneapolis", games:[[[5,"Alabama"],[12,"NC State","Utah State"]], [[4,"St. John's"],[13,"McNeese"]]]},
-      {site:"Louisville",  games:[[[6,"Kentucky"],[11,"Clemson","Providence"]], [[3,"Virginia"],[14,"Liberty"]]]},
-      {site:"Fort Worth",  games:[[[7,"Purdue"],[10,"Baylor"]], [[2,"Houston"],[15,"Furman"]]]}]},
     {name:"East", site:"New York", pods:[
-      {site:"Charlotte",  games:[[[1,"Duke"],[16,"Vermont","American"]], [[8,"Texas A&M"],[9,"Cincinnati"]]]},
-      {site:"Spokane",    games:[[[5,"Michigan"],[12,"Creighton","New Mexico"]], [[4,"Tennessee"],[13,"UNC Wilmington"]]]},
-      {site:"Omaha",      games:[[[6,"Nebraska"],[11,"Grand Canyon"]], [[3,"Iowa State"],[14,"Harvard"]]]},
-      {site:"Pittsburgh", games:[[[7,"Ohio State"],[10,"TCU","VCU"]], [[2,"UConn"],[15,"James Madison","Merrimack"]]]}]},
+      {site:"Charlotte",  games:[[[1,"Florida"],[16,"Merrimack","American"]], [[8,"Baylor"],[9,"Villanova"]]]},
+      {site:"Sacramento", games:[[[5,"Miami"],[12,"Oklahoma State","VCU"]], [[4,"Texas Tech"],[13,"UNC Wilmington"]]]},
+      {site:"Louisville", games:[[[6,"Nebraska"],[11,"Clemson","New Mexico"]], [[3,"Texas"],[14,"McNeese"]]]},
+      {site:"Omaha",      games:[[[7,"Kentucky"],[10,"Cincinnati","Purdue"]], [[2,"Virginia"],[15,"Wright State"]]]}]},
     {name:"West", site:"Los Angeles", pods:[
-      {site:"Sacramento",  games:[[[1,"Arizona"],[16,"Bethune-Cookman","Long Island"]], [[8,"USC"],[9,"Marquette"]]]},
-      {site:"Minneapolis", games:[[[5,"Arkansas"],[12,"High Point"]], [[4,"Louisville"],[13,"Miami (OH)"]]]},
-      {site:"Fort Worth",  games:[[[6,"UCLA"],[11,"Oklahoma","West Virginia"]], [[3,"Texas"],[14,"Murray State"]]]},
-      {site:"Spokane",     games:[[[7,"BYU"],[10,"Wisconsin"]], [[2,"Gonzaga"],[15,"North Dakota State"]]]}]}
+      {site:"Pittsburgh",  games:[[[1,"UConn"],[16,"Vermont","Tennessee State"]], [[8,"Missouri"],[9,"Ohio State"]]]},
+      {site:"Minneapolis", games:[[[5,"Vanderbilt"],[12,"Santa Clara"]], [[4,"UCLA"],[13,"Akron"]]]},
+      {site:"Sacramento",  games:[[[6,"BYU"],[11,"Wisconsin","Georgia"]], [[3,"Gonzaga"],[14,"Western Kentucky"]]]},
+      {site:"Spokane",     games:[[[7,"USC"],[10,"TCU"]], [[2,"Kansas"],[15,"Montana State","Arkansas State"]]]}]},
+    {name:"Midwest", site:"Kansas City", pods:[
+      {site:"Charlotte",  games:[[[1,"Duke"],[16,"Bethune-Cookman","Long Island"]], [[8,"Texas A&M"],[9,"Indiana"]]]},
+      {site:"Spokane",    games:[[[5,"Iowa State"],[12,"High Point"]], [[4,"Alabama"],[13,"Memphis"]]]},
+      {site:"Fort Worth", games:[[[6,"Arkansas"],[11,"Grand Canyon"]], [[3,"Arizona"],[14,"UC Santa Barbara"]]]},
+      {site:"Pittsburgh", games:[[[7,"Marquette"],[10,"West Virginia"]], [[2,"Michigan State"],[15,"St. Thomas","Queens"]]]}]},
+    {name:"South", site:"San Antonio", pods:[
+      {site:"Louisville",  games:[[[1,"Illinois"],[16,"Central Arkansas","Howard"]], [[8,"North Carolina"],[9,"Auburn"]]]},
+      {site:"Minneapolis", games:[[[5,"Tennessee"],[12,"Creighton","NC State"]], [[4,"St. John's"],[13,"Murray State"]]]},
+      {site:"Omaha",       games:[[[6,"Michigan"],[11,"LSU","Utah State"]], [[3,"Louisville"],[14,"Harvard"]]]},
+      {site:"Fort Worth",  games:[[[7,"Saint Louis"],[10,"Iowa"]], [[2,"Houston"],[15,"Furman"]]]}]}
   ],
-  lastFourByes:  ["Indiana","Cincinnati","Baylor","Wisconsin"],
-  lastFourIn:    ["Providence","Utah State","Creighton","New Mexico"],
-  firstFourOut:  ["Maryland","Virginia Tech","LSU","Oklahoma State"],
-  nextFourOut:   ["Florida State","Xavier","SMU","Ole Miss"],
+  lastFourByes:  ["Auburn","Iowa","TCU","West Virginia"],
+  lastFourIn:    ["NC State","Clemson","Oklahoma State","VCU"],
+  firstFourOut:  ["Xavier","Virginia Tech","Providence","Oklahoma"],
+  nextFourOut:   ["Ole Miss","Florida State","Minnesota","Maryland"],
   // Automatic qualifiers (projected conference champions), marked with a hollow circle on Lunardi's page.
   // Move a team to autoBidsConfirmed once it actually wins its conference tournament.
-  autoBids: ["Florida","Central Arkansas","Howard","Wichita State","Santa Clara","Saint Louis","UC San Diego","Montana State","Wright State",
-    "Illinois","Queens","Tennessee State","McNeese","Liberty","Furman","Duke","Vermont","American","UNC Wilmington","Grand Canyon",
-    "Harvard","UConn","James Madison","Merrimack","Arizona","Bethune-Cookman","Long Island","High Point","Miami (OH)","Murray State",
-    "North Dakota State","Gonzaga"],
+  autoBids: ["Florida","Merrimack","American","UNC Wilmington","McNeese","Wright State","UConn","Vermont","Tennessee State",
+    "Santa Clara","Akron","Gonzaga","Western Kentucky","Montana State","Arkansas State","Duke","Bethune-Cookman","Long Island",
+    "High Point","Memphis","Grand Canyon","UC Santa Barbara","St. Thomas","Queens","Illinois","Central Arkansas","Howard",
+    "Murray State","Saint Louis","Harvard","Houston","Furman"],
   autoBidsConfirmed: []
 };
 // Every team the Bracketology filter counts: the projected field + first four out + next four out
@@ -468,7 +468,8 @@ const BRACKET_ALIASES = {"long island university":"long island","liu":"long isla
   "connecticut":"uconn","miami (fl)":"miami","miami fl":"miami","miami oh":"miami (oh)","miami (ohio)":"miami (oh)","saint johns":"st johns",
   "st johns (ny)":"st johns","american university":"american","bethune cookman":"bethune-cookman","b-cu":"bethune-cookman",
   "c arkansas":"central arkansas","n dakota st":"north dakota state","north dakota st":"north dakota state","mississippi":"ole miss",
-  "uc san diego tritons":"uc san diego","ucsd":"uc san diego","north carolina state":"nc state","southern methodist":"smu"};
+  "uc san diego tritons":"uc san diego","ucsd":"uc san diego","north carolina state":"nc state","southern methodist":"smu",
+  "western ky":"western kentucky","santa barbara":"uc santa barbara","st thomas (mn)":"st thomas","st thomas-minnesota":"st thomas"};
 const normName = s => { let n=(s||"").toLowerCase().replace(/[.'’]/g,"").replace(/&/g,"and").replace(/\s+/g," ").trim(); return BRACKET_ALIASES[n]||n; };
 const BRACKET_SET = new Set(BRACKET_FIELD.map(normName));
 
