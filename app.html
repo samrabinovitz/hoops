@@ -1270,10 +1270,12 @@ function showTop(fresh){
     loadGame(top.id);
   }
 }
-function openTeam(id){
+// The name shown on whatever was tapped, used for the header until ESPN's data arrives (or if it never does)
+const nameHint = el => { const n = el && el.querySelector(".tm-oname,.bk-name,.full,.abbr,.gm-tn b"); return n ? n.textContent.trim() : ""; };
+function openTeam(id, hint){
   if(!id) return; id = String(id);
   const top = navTop(); if(top && top.type==="team" && top.id===id) return;
-  navPush({type:"team", id});
+  navPush({type:"team", id, hint: hint || ""});
 }
 function openGame(id){
   if(!id) return; id = String(id);
@@ -1282,15 +1284,15 @@ function openGame(id){
 }
 document.getElementById("standings").addEventListener("click", e=>{
   if(e.target.closest(".bk-search,.bk-r")) return;
-  const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid);
+  const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid, nameHint(t));
 });
 document.getElementById("standings").addEventListener("keydown", e=>{
-  if(e.key!=="Enter") return; const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid);
+  if(e.key!=="Enter") return; const t = e.target.closest(".tap[data-tid]"); if(t) openTeam(t.dataset.tid, nameHint(t));
 });
 document.getElementById("team").addEventListener("click", e=>{
   if(e.target.closest(".tm-back")){ navBack(); return; }
   const tg = e.target.closest(".tm-toggle"); if(tg){ toggleSection(tg); return; }
-  const o = e.target.closest(".tap[data-tid]"); if(o) { openTeam(o.dataset.tid); return; }
+  const o = e.target.closest(".tap[data-tid]"); if(o) { openTeam(o.dataset.tid, nameHint(o)); return; }
   const gr = e.target.closest(".tm-game[data-eid]"); if(gr) openGame(gr.dataset.eid);
 });
 
@@ -1316,8 +1318,9 @@ function renderTeam(){
   const el = document.getElementById("team"), id = openTeamId; if(!id) return;
   const T = teamCache[id] || {}, info = T.info || {}, sd = findStanding(id);
   const base = sd ? sd.row : {};
-  const name = info.displayName || [info.location, info.name].filter(Boolean).join(" ") || base.school || "";
-  const abbr = info.abbreviation || base.abbr || "";
+  const hint = (navTop() && navTop().hint) || "";
+  const name = info.displayName || [info.location, info.name].filter(Boolean).join(" ") || base.school || hint;
+  const abbr = info.abbreviation || base.abbr || hint.slice(0,4).toUpperCase();
   const logoT = {abbr, logo:(info.logos&&info.logos[0]&&info.logos[0].href)||base.logo||espnLogo(id), c1:info.color?"#"+info.color:(base.c1||"#5b6470"), c2:base.c2||"#ffffff"};
   const conf = (sd && sd.conf) || CONF_BY_ID[info.groups && info.groups.id] || "";
   const recItems = (info.record && info.record.items) || [];
@@ -1492,8 +1495,8 @@ document.getElementById("game").addEventListener("click", e=>{
   const sw = e.target.closest(".gm-side"); if(sw){ gameSide = top.side = sw.dataset.side; renderGame(); return; }
   if(e.target.closest(".gm-more")){ gameAllPlays = top.all = !gameAllPlays; renderGame(); return; }
   const tm = e.target.closest(".gm-team[data-tid]");
-  if(tm){ openTeam(tm.dataset.tid); return; }
-  const op = e.target.closest(".tm-opp.tap[data-tid]"); if(op) openTeam(op.dataset.tid);
+  if(tm){ openTeam(tm.dataset.tid, nameHint(tm)); return; }
+  const op = e.target.closest(".tm-opp.tap[data-tid]"); if(op) openTeam(op.dataset.tid, nameHint(op));
 });
 
 // Upcoming game: when and where, ESPN's prediction, the line, season leaders, and each team's last five games
