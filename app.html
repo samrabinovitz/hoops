@@ -203,13 +203,24 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .gm-wp-top{display:flex;justify-content:space-between;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .gm-wp-top b{color:var(--fg);letter-spacing:0}
 .gm-wp-bar{display:flex;height:10px;border-radius:999px;overflow:hidden;margin:8px 0 4px;background:var(--chip)}
-.gm-wp-bar i{display:block;height:100%}
+.gm-wp-bar i{display:block;height:100%;background:var(--muted);opacity:.45}
+.gm-wp-bar i.fav{background:var(--accent);opacity:1}
+.gm-wp-bar i+i{border-left:2px solid var(--surface)}
 .gm-wp-lab{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .gm-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:18px 0 12px;padding:4px;background:var(--chip);border-radius:12px}
 .gm-tab{border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:700;padding:9px 4px;border-radius:9px;cursor:pointer;white-space:nowrap}
 .gm-tab[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .gm-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .gm-sides{display:flex;gap:6px;margin:0 0 8px}
+.gm-tabs.two{grid-template-columns:repeat(2,1fr)}
+.gm-when{display:grid;justify-items:center;gap:2px;font-family:var(--display);text-align:center}
+.gm-when b{font-size:30px;font-weight:800;line-height:1}
+.gm-when small{font-family:var(--body);font-size:13px;font-weight:600;color:var(--muted)}
+.gm-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:10px;font-variant-numeric:tabular-nums}
+.gm-line span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:auto}
+.gm-line b{font-size:15px}
+.gm-ld div{display:grid;min-width:0}
+.gm-ld small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-side{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-size:14px;font-weight:700;padding:5px 12px 5px 6px;border-radius:999px;cursor:pointer}
 .gm-side .logo{width:20px;height:20px;border-radius:5px;font-size:10px}
 .gm-side[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
@@ -646,7 +657,7 @@ function box(g){
   const status = g.state==="l" ? `<span class="live">${esc(g.detail)}</span>` : g.state==="f" ? `<span class="final">${esc(g.detail)}</span>` : `<span>${esc(g.detail)}</span>`;
   const net = g.nets[0];
   const tv = g.state!=="f" && net ? `<span class="tv${isAlt(net)?" alt":""}">${esc(net)}</span>` : "";
-  const open = (g.state==="l" || (g.state==="f" && g.done)) && !String(g.id).startsWith("s");
+  const open = !String(g.id).startsWith("s");
   return `<article class="game${open?" tap":""}" tabindex="0"${open?` data-eid="${esc(g.id)}" role="button"`:""} aria-label="${esc(g.away.school)} at ${esc(g.home.school)}"><div class="status">${status}${tv}</div>
     ${teamRow(g.away,g)}${teamRow(g.home,g)}</article>`;
 }
@@ -1155,11 +1166,12 @@ function parseBox(j, id){
 async function loadTeam(id){
   const season = SEASON_YEAR + 1;
   const T = teamCache[id] = teamCache[id] || {};
-  const [info, sched, roster] = await Promise.all([
-    getJSON(`${TEAM_API}/teams/${id}`).catch(()=>null),
+  // ESPN doesn't let apps read its /teams/{id} feed, but the schedule feed carries the same team details
+  const [sched, roster] = await Promise.all([
     getJSON(`${TEAM_API}/teams/${id}/schedule?season=${season}`).catch(()=>null),
     getJSON(`${TEAM_API}/teams/${id}/roster`).catch(()=>null)]);
-  if(info) T.info = info.team || info;
+  const info = sched && sched.team;
+  if(info) T.info = {...info, logos: info.logo ? [{href:info.logo}] : info.logos, record:{items:[{type:"total", summary:info.recordSummary||""}]}};
   if(sched) T.games = parseSchedule(sched, id);
   if(roster) T.roster = parseRoster(roster);
   T.failed = !info && !sched && !roster;
@@ -1331,7 +1343,7 @@ function renderTeam(){
     else if(g.state==="l") res = `<span class="tm-live">${esc(g.detail||"Live")}</span><span class="tm-sc">${g.us??0}-${g.them??0}</span>`;
     else if(g.state==="x") res = `<span class="tm-time">${esc(g.detail||"Postponed")}</span>`;
     else res = `<span class="tm-time">${/TBD/i.test(g.detail)?"TBD":g.date.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}</span>${g.tv[0]?`<span class="tv${isAlt(g.tv[0])?" alt":""}">${esc(g.tv[0])}</span>`:""}`;
-    const gOpen = g.state==="l" || g.state==="f";
+    const gOpen = true;
     return `<div class="tm-game${i===nextIdx?" next":""}${gOpen?" has-game":""}"${gOpen?` data-eid="${esc(g.id)}"`:""}><span class="tm-date">${d}</span>
       <div class="tm-opp tap" data-tid="${esc(g.opp.id)}" role="button" tabindex="0"><span class="tm-at">${at}</span>${logoHTML(g.opp)}${g.opp.rank?`<span class="rank">${g.opp.rank}</span>`:""}<span class="tm-oname">${esc(g.opp.name)}</span>${g.where==="n"?`<span class="tm-n" title="Neutral site">N</span>`:""}</div>
       <div class="tm-r">${res}</div></div>`;
@@ -1432,7 +1444,27 @@ function parseGame(j){
   const wp = (j.winprobability||[]).length ? j.winprobability[j.winprobability.length-1].homeWinPercentage : null;
   const gi = j.gameInfo || {}, venue = gi.venue || {};
   const where = [venue.fullName, venue.address && [venue.address.city, venue.address.state].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
-  return {state, detail: st.shortDetail || st.detail || "", completed: st.completed, date: comp.date ? new Date(comp.date) : null,
+  // Pregame extras: ESPN's matchup predictor, the betting line, season leaders, last five games
+  const pr = j.predictor || {};
+  const predictor = pr.homeTeam && pr.awayTeam ? {home:num(pr.homeTeam.gameProjection), away:num(pr.awayTeam.gameProjection)} : null;
+  const pc = (j.pickcenter||[])[0];
+  const line = pc ? {provider:(pc.provider&&pc.provider.name)||"", details:pc.details||"", ou:pc.overUnder} : null;
+  const whichSide = tid => side.home && side.home.id===String(tid) ? "home" : "away";
+  const leaders = {};
+  for(const t of j.leaders||[]){
+    leaders[whichSide(t.team && t.team.id)] = (t.leaders||[]).map(c=>{ const l = (c.leaders||[])[0] || {};
+      return {cat:c.displayName||c.name, value:l.displayValue||"", name:(l.athlete&&(l.athlete.shortName||l.athlete.displayName))||""}; });
+  }
+  const last5 = {};
+  for(const t of j.lastFiveGames||[]){
+    last5[whichSide(t.team && t.team.id)] = (t.events||[]).map(e=>{ const o = e.opponent||{};
+      return {date:e.gameDate ? new Date(e.gameDate) : null, at:e.atVs||"vs", res:e.gameResult||"", score:e.score||"",
+        opp:{id:o.id, abbr:o.abbreviation||"", logo:o.logo||(o.logos&&o.logos[0]&&o.logos[0].href)||espnLogo(o.id), c1:"#5b6470", c2:"#ffffff"}}; })
+      .sort((a,b)=>(b.date||0)-(a.date||0));
+  }
+  const conf = !!comp.conferenceCompetition;
+  return {predictor, line, leaders, last5, conf,
+    state, detail: st.shortDetail || st.detail || "", completed: st.completed, date: comp.date ? new Date(comp.date) : null,
     away:side.away, home:side.home, tv, box, tstats, plays, wp, where, neutral: !!comp.neutralSite};
 }
 async function loadGame(id){
@@ -1445,7 +1477,10 @@ async function loadGame(id){
   }catch(e){ if(openGameId!==id) return; if(!gameData) gameData = {failed:true}; }
   renderGame();
   clearTimeout(gameTimer);
-  if(gameData && gameData.state==="l" && !document.hidden) gameTimer = setTimeout(()=>loadGame(id), GAME_REFRESH_MS);
+  if(gameData && !document.hidden){
+    if(gameData.state==="l") gameTimer = setTimeout(()=>loadGame(id), GAME_REFRESH_MS);
+    else if(gameData.state==="u" && gameData.date && gameData.date - Date.now() < 30*60_000) gameTimer = setTimeout(()=>loadGame(id), 60_000);
+  }
 }
 document.addEventListener("visibilitychange", ()=>{ if(!openGameId) return; if(document.hidden) clearTimeout(gameTimer); else loadGame(openGameId); });
 
@@ -1457,9 +1492,52 @@ document.getElementById("game").addEventListener("click", e=>{
   const sw = e.target.closest(".gm-side"); if(sw){ gameSide = top.side = sw.dataset.side; renderGame(); return; }
   if(e.target.closest(".gm-more")){ gameAllPlays = top.all = !gameAllPlays; renderGame(); return; }
   const tm = e.target.closest(".gm-team[data-tid]");
-  if(tm) openTeam(tm.dataset.tid);
+  if(tm){ openTeam(tm.dataset.tid); return; }
+  const op = e.target.closest(".tm-opp.tap[data-tid]"); if(op) openTeam(op.dataset.tid);
 });
 
+// Upcoming game: when and where, ESPN's prediction, the line, season leaders, and each team's last five games
+function renderPreview(el, back, G){
+  const {away, home} = G;
+  const team = t => `<div class="gm-team tap" data-tid="${esc(t.id)}">${logoHTML(t)}
+      <div class="gm-tn">${t.rank?`<span class="rank">${t.rank}</span>`:""}<b>${esc(t.abbr)}</b></div><small>${esc(t.rec)}</small></div>`;
+  const d = G.date;
+  const when = d ? `<div class="gm-when"><b>${d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}</b><small>${d.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})}</small></div>` : `<div class="gm-when"><b>TBD</b></div>`;
+  const meta = [G.tv[0] && `<span class="tv${isAlt(G.tv[0])?" alt":""}">${esc(G.tv[0])}</span>`, G.where && esc(G.where), G.neutral && "Neutral site", G.conf && "Conference game"].filter(Boolean).join(" ");
+  const board = `<div class="gm-board"><div class="gm-status"><span>Upcoming</span></div>
+      <div class="gm-main">${team(away)}${when}${team(home)}</div>${meta?`<div class="gm-meta">${meta}</div>`:""}</div>`;
+  let cards = "";
+  if(G.predictor){
+    const h = Math.round(G.predictor.home), a = Math.round(G.predictor.away), fav = h>=a ? home : away;
+    cards += `<div class="gm-wp"><div class="gm-wp-top"><span>ESPN prediction</span><b>${esc(fav.abbr)} ${Math.max(h,a)}%</b></div>
+      <div class="gm-wp-bar" role="img" aria-label="${esc(away.abbr)} ${a}%, ${esc(home.abbr)} ${h}%"><i class="${a>h?"fav":""}" style="width:${a}%"></i><i class="${h>=a?"fav":""}" style="width:${h}%"></i></div>
+      <div class="gm-wp-lab"><span>${esc(away.abbr)} ${a}%</span><span>${esc(home.abbr)} ${h}%</span></div></div>`;
+  }
+  if(G.line && (G.line.details || G.line.ou)){
+    cards += `<div class="gm-line"><span>Line${G.line.provider?` · ${esc(G.line.provider)}`:""}</span><b>${esc(G.line.details || "Even")}</b>${G.line.ou?`<b>O/U ${esc(G.line.ou)}</b>`:""}</div>`;
+  }
+  // Tabs: season leaders, last 5 games
+  const tabs = [["leaders","Season leaders"],["last5","Last 5 games"]];
+  if(!tabs.some(([k])=>k===gameTab)) gameTab = "leaders";
+  let panel;
+  if(gameTab==="leaders"){
+    const A = G.leaders.away || [], H = G.leaders.home || [];
+    panel = A.length || H.length ? `<div class="table gm-ts"><div class="gm-ts-row head"><span>${esc(away.abbr)}</span><span></span><span>${esc(home.abbr)}</span></div>
+      ${(A.length ? A : H).map((c,i)=>{ const a = A.find(x=>x.cat===c.cat) || {}, h = H.find(x=>x.cat===c.cat) || {};
+        return `<div class="gm-ts-row gm-ld"><div><b>${esc(a.value||"–")}</b><small>${esc(a.name||"")}</small></div><span>${esc(c.cat)} per game</span><div><b>${esc(h.value||"–")}</b><small>${esc(h.name||"")}</small></div></div>`; }).join("")}</div>`
+      : `<p class="empty">No season stats yet.</p>`;
+  } else {
+    const L = G.last5[gameSide] || [];
+    const sides = `<div class="gm-sides" role="tablist">${["away","home"].map(k=>`<button class="gm-side" role="tab" data-side="${k}" aria-selected="${gameSide===k}">${logoHTML(G[k])}${esc(G[k].abbr)}</button>`).join("")}</div>`;
+    panel = sides + (L.length ? `<div class="table">${L.map(e=>`<div class="tm-game"><span class="tm-date">${e.date ? e.date.toLocaleDateString([], {month:"short", day:"numeric", year: e.date.getFullYear()!==new Date().getFullYear() ? "numeric" : undefined}) : ""}</span>
+        <div class="tm-opp tap" data-tid="${esc(e.opp.id)}"><span class="tm-at">${esc(e.at)}</span>${logoHTML(e.opp)}<span class="tm-oname">${esc(e.opp.abbr)}</span></div>
+        <div class="tm-r"><span class="tm-res ${e.res==="W"?"w":"l"}">${esc(e.res)}</span><span class="tm-sc">${esc(e.score)}</span></div></div>`).join("")}</div>
+        <p class="st-note">Includes games from last season until each team has played five this season.</p>` : `<p class="empty">No recent games.</p>`);
+  }
+  el.innerHTML = back + board + cards +
+    `<div class="gm-tabs two" role="tablist" aria-label="Preview">${tabs.map(([k,l])=>`<button type="button" role="tab" class="gm-tab" id="gt-${k}" data-tab="${k}" aria-selected="${gameTab===k}" aria-controls="gm-panel">${l}</button>`).join("")}</div>
+     <div class="gm-panel" id="gm-panel" role="tabpanel" aria-labelledby="gt-${gameTab}">${panel}</div>`;
+}
 function renderGame(){
   const el = document.getElementById("game"); if(!openGameId) return;
   const back = `<button class="tm-back" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back</button>`;
@@ -1467,6 +1545,7 @@ function renderGame(){
   if(!G){ el.innerHTML = back + `<div class="skeleton" style="height:180px"></div><div class="skeleton" style="height:320px;margin-top:12px"></div>`; return; }
   if(G.failed || !G.away || !G.home){ el.innerHTML = back + `<p class="empty">Can't reach ESPN for this game right now.</p>`; return; }
   const {away, home} = G;
+  if(G.state==="u"){ renderPreview(el, back, G); return; }
   const done = G.state==="f";
 
   // --- Scoreboard
@@ -1483,7 +1562,7 @@ function renderGame(){
   if(G.state==="l" && G.wp!=null){
     const h = Math.round(G.wp*100), a = 100-h, fav = h>=a ? home : away, fp = Math.max(h,a);
     wp = `<div class="gm-wp"><div class="gm-wp-top"><span>Win probability</span><b>${esc(fav.abbr)} ${fp}%</b></div>
-      <div class="gm-wp-bar" role="img" aria-label="${esc(away.abbr)} ${a}%, ${esc(home.abbr)} ${h}%"><i style="width:${a}%;background:${esc(away.c1)}"></i><i style="width:${h}%;background:${esc(home.c1)}"></i></div>
+      <div class="gm-wp-bar" role="img" aria-label="${esc(away.abbr)} ${a}%, ${esc(home.abbr)} ${h}%"><i class="${a>h?"fav":""}" style="width:${a}%"></i><i class="${h>=a?"fav":""}" style="width:${h}%"></i></div>
       <div class="gm-wp-lab"><span>${esc(away.abbr)} ${a}%</span><span>${esc(home.abbr)} ${h}%</span></div></div>`;
   }
   const board = `<div class="gm-board"><div class="gm-status">${status}${G.state==="l" && G.updated ? `<small>Updated ${G.updated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"})}</small>`:""}</div>
