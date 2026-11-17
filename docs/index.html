@@ -268,6 +268,13 @@ main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .gm-play.sc .gm-ps{color:var(--fg)}
 .gm-more{display:block;margin:10px auto 0}
 @media (prefers-reduced-motion:reduce){.gm-status .live::before{animation:none}}
+/* Game-type notes (tournaments) */
+.g-note,.tm-note,.gm-note{font-size:12px;font-weight:600;color:var(--muted);line-height:1.35;overflow-wrap:anywhere}
+.g-note{margin:-2px 0 0}
+.tm-note{grid-column:2 / -1;margin-top:-4px;font-size:11px}
+.gm-note{margin:-4px 0 10px;font-size:13px;white-space:normal;text-align:center}
+.note-ncaa{color:var(--accent);font-weight:700}
+.note-ncaa .mm{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--accent);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:1px}
 /* Bracketology */
 .bk-regions{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .bk-region{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 12px 10px;min-width:0}
@@ -506,6 +513,16 @@ const isAlt = n => { const t=netType(n); return t==="conf"||t==="stream"; };
 /* =========================================================================
    READING ESPN'S FEED -> one tidy object per game
    ========================================================================= */
+// What kind of game it is, from ESPN's note: "Players Era 8 - Championship", "Big East Tournament - Final",
+// "NCAA Men's Basketball Championship - West Region - 1st Round". Regular games have no note.
+function gameNote(headline){
+  const h = String(headline||"").trim(); if(!h) return null;
+  const ncaa = /^NCAA Men'?s Basketball Championship/i.test(h);
+  const text = h.replace(/^NCAA Men'?s Basketball Championship/i, "NCAA Tournament").replace(/\s+-\s+/g, " · ");
+  return {text, kind: ncaa ? "ncaa" : "event"};
+}
+// NCAA games get a March Madness badge, so the words after it skip "NCAA Tournament"
+const noteHTML = (n, cls) => n ? `<div class="${cls} note-${n.kind}">${n.kind==="ncaa"?`<span class="mm">March Madness</span>${esc(n.text.replace(/^NCAA Tournament\s*·\s*/,""))}`:esc(n.text)}</div>` : "";
 // ESPN serves every team's logo at a fixed address based on its team id, so use that when a feed leaves the logo out
 const espnLogo = id => id ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png` : "";
 function parseTeam(c, state){
@@ -555,7 +572,8 @@ function parseEvent(ev){
   if(done && !side.home.winner && !side.away.winner && side.home.score!=null && side.away.score!=null){
     side.home.winner = side.home.score > side.away.score; side.away.winner = side.away.score > side.home.score;
   }
-  return {id:ev.id, state, detail, done, time:Date.parse(ev.date)||0, away:side.away, home:side.home, nets:parseTV(comp)};
+  const note = gameNote(((comp.notes||[])[0]||{}).headline);
+  return {id:ev.id, state, detail, done, time:Date.parse(ev.date)||0, away:side.away, home:side.home, nets:parseTV(comp), note};
 }
 
 /* =========================================================================
@@ -674,7 +692,7 @@ function box(g){
   const net = g.nets[0];
   const tv = g.state!=="f" && net ? `<span class="tv${isAlt(net)?" alt":""}">${esc(net)}</span>` : "";
   const open = !String(g.id).startsWith("s");
-  return `<article class="game${open?" tap":""}" tabindex="0"${open?` data-eid="${esc(g.id)}" role="button"`:""} aria-label="${esc(g.away.school)} at ${esc(g.home.school)}"><div class="status">${status}${tv}</div>
+  return `<article class="game${open?" tap":""}" tabindex="0"${open?` data-eid="${esc(g.id)}" role="button"`:""} aria-label="${esc(g.away.school)} at ${esc(g.home.school)}"><div class="status">${status}${tv}</div>${noteHTML(g.note, "g-note")}
     ${teamRow(g.away,g)}${teamRow(g.home,g)}</article>`;
 }
 function summary(set, chips){
@@ -1151,7 +1169,7 @@ function parseSchedule(j, id){
       opp:{id:ot.id, abbr:ot.abbreviation||"", name:ot.shortDisplayName||ot.location||ot.displayName||"",
         logo:ot.logo||(ot.logos&&ot.logos[0]&&ot.logos[0].href)||espnLogo(ot.id), c1:ot.color?"#"+ot.color:"#5b6470", c2:"#ffffff",
         rank:(op.curatedRank && op.curatedRank.current<=25) ? op.curatedRank.current : null},
-      tv, conf: !!(c.conferenceCompetition)};
+      tv, conf: !!(c.conferenceCompetition), note: gameNote(((c.notes||[])[0]||{}).headline)};
   }).filter(Boolean).sort((a,b)=>a.date-b.date);
 }
 function parseRoster(j){
@@ -1365,7 +1383,7 @@ function renderTeam(){
     const gOpen = true;
     return `<div class="tm-game${i===nextIdx?" next":""}${gOpen?" has-game":""}"${gOpen?` data-eid="${esc(g.id)}"`:""}><span class="tm-date">${d}</span>
       <div class="tm-opp tap" data-tid="${esc(g.opp.id)}" role="button" tabindex="0"><span class="tm-at">${at}</span>${logoHTML(g.opp)}${g.opp.rank?`<span class="rank">${g.opp.rank}</span>`:""}<span class="tm-oname">${esc(g.opp.name)}</span>${g.where==="n"?`<span class="tm-n" title="Neutral site">N</span>`:""}</div>
-      <div class="tm-r">${res}</div></div>`;
+      <div class="tm-r">${res}</div>${noteHTML(g.note, "tm-note")}</div>`;
   };
   const played = games.filter(g=>g.state==="f"), wins = played.filter(g=>g.won).length;
   const sched = games.length
@@ -1482,7 +1500,8 @@ function parseGame(j){
       .sort((a,b)=>(b.date||0)-(a.date||0));
   }
   const conf = !!comp.conferenceCompetition;
-  return {predictor, line, leaders, last5, conf,
+  const note = gameNote(j.header && (j.header.gameNote || (((j.header.competitions||[])[0]||{}).notes||[{}])[0].headline));
+  return {predictor, line, leaders, last5, conf, note,
     state, detail: st.shortDetail || st.detail || "", completed: st.completed, date: comp.date ? new Date(comp.date) : null,
     away:side.away, home:side.home, tv, box, tstats, plays, wp, where, neutral: !!comp.neutralSite};
 }
@@ -1523,7 +1542,7 @@ function renderPreview(el, back, G){
   const d = G.date;
   const when = d ? `<div class="gm-when"><b>${d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}</b><small>${d.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})}</small></div>` : `<div class="gm-when"><b>TBD</b></div>`;
   const meta = [G.tv[0] && `<span class="tv${isAlt(G.tv[0])?" alt":""}">${esc(G.tv[0])}</span>`, G.where && esc(G.where), G.neutral && "Neutral site", G.conf && "Conference game"].filter(Boolean).join(" ");
-  const board = `<div class="gm-board"><div class="gm-status"><span>Upcoming</span></div>
+  const board = `<div class="gm-board"><div class="gm-status"><span>Upcoming</span></div>${noteHTML(G.note, "gm-note")}
       <div class="gm-main">${team(away)}${when}${team(home)}</div>${meta?`<div class="gm-meta">${meta}</div>`:""}</div>`;
   let cards = "";
   if(G.predictor){
@@ -1584,7 +1603,7 @@ function renderGame(){
       <div class="gm-wp-bar" role="img" aria-label="${esc(away.abbr)} ${a}%, ${esc(home.abbr)} ${h}%"><i class="${a>h?"fav":""}" style="width:${a}%"></i><i class="${h>=a?"fav":""}" style="width:${h}%"></i></div>
       <div class="gm-wp-lab"><span>${esc(away.abbr)} ${a}%</span><span>${esc(home.abbr)} ${h}%</span></div></div>`;
   }
-  const board = `<div class="gm-board"><div class="gm-status">${status}${G.state==="l" && G.updated ? `<small>Updated ${G.updated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"})}</small>`:""}</div>
+  const board = `<div class="gm-board"><div class="gm-status">${status}${G.state==="l" && G.updated ? `<small>Updated ${G.updated.toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"})}</small>`:""}</div>${noteHTML(G.note, "gm-note")}
       <div class="gm-main">${teamBlock(away)}<div class="gm-scores">${sc(away,home)}<span class="gm-dash">–</span>${sc(home,away)}</div>${teamBlock(home)}</div>
       ${lineTable}${meta?`<div class="gm-meta">${meta}</div>`:""}</div>${wp}`;
 
